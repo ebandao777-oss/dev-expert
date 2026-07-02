@@ -12,11 +12,13 @@
 ### 第一步：明确意图（Proposal）
 
 用3句话以内说明：
+
 - **Intent**：为什么要做这个变更
 - **Scope**：变更范围（In scope / Out of scope）
 - **Approach**：大致技术方向
 
 **示例**：
+
 ```
 Intent: 用户请求添加暗黑模式以减少夜间使用时的眼疲劳
 Scope: In scope - 主题切换、系统偏好检测、localStorage持久化
@@ -24,12 +26,21 @@ Scope: In scope - 主题切换、系统偏好检测、localStorage持久化
 Approach: CSS自定义属性 + React Context管理状态
 ```
 
+### 第二步：编写 Requirements（ADDED/MODIFIED/REMOVED）
+
+按变更类型生成三类 Requirements，使用 RFC 2119 关键词（MUST/SHALL/SHOULD/MAY），每个 Requirement 至少一个 Scenario。
+
+#### ADDED Requirements（新增功能）
+
+```markdown
 ## ADDED Requirements
 
 ### Requirement: [需求名称]
+
 The system SHALL [具体行为描述].
 
 #### Scenario: [场景名称]
+
 - GIVEN [前置条件]
 - WHEN [用户操作/系统事件]
 - THEN [预期结果]
@@ -42,10 +53,12 @@ The system SHALL [具体行为描述].
 ## MODIFIED Requirements
 
 ### Requirement: [需求名称]
+
 The system MUST [新行为描述].
 (Previously: [原行为描述])
 
 #### Scenario: [场景名称]
+
 - GIVEN [前置条件]
 - WHEN [用户操作/系统事件]
 - THEN [新预期结果]
@@ -57,6 +70,7 @@ The system MUST [新行为描述].
 ## REMOVED Requirements
 
 ### Requirement: [需求名称]
+
 [移除原因说明]
 ```
 
@@ -66,13 +80,16 @@ The system MUST [新行为描述].
 ## Design: [变更名称]
 
 ### Technical Approach
+
 [技术实现思路，1-2段]
 
 ### Architecture Decisions
+
 - Decision: [决策点]
   - Reason: [选择理由]
 
 ### File Changes
+
 - `[文件路径]` (new/modified/deleted)
 ```
 
@@ -82,32 +99,44 @@ The system MUST [新行为描述].
 ## Tasks
 
 ### Wave 1（无依赖，可并行）
+
 - [ ] Task 1.1: [具体任务]
 - [ ] Task 1.2: [具体任务]
 
 ### Wave 2（依赖Wave 1）
+
 - [ ] Task 2.1: [具体任务]
 ```
 
 ### 第五步：编码前Spec验证
 
 在开始编码前，检查：
+
 - [ ] 每个Requirement是否有至少一个Scenario
 - [ ] 每个Scenario是否可测试（有明确的Given/When/Then）
 - [ ] 成功标准是否明确（"系统应该..."而非"系统可能..."）
 - [ ] 变更范围是否聚焦（没有无意识扩散）
 
 **如无spec，提示**：
+
 ```
 ⚠️ 未检测到spec。建议先完成spec对齐再编码。
 用 `Spec驱动开发` 生成spec，或提供已有spec。
 ```
 
 **如有spec，作为编码依据**：
+
 ```
 ✓ 检测到spec。编码时将严格按以下scenario实现：
 - [Scenario列表]
 ```
+
+### 第六步：记录到项目记忆
+
+Spec验证通过后，将需求规格和设计决策记录到项目记忆（参见 `project-memory-management.md`）：
+- 记录 Spec 的 Intent/Scope/Approach（Decision Record 模式）：作为后续编码和审查的依据
+- 记录 Design 中的架构决策和 File Changes 清单（Convention Capture 模式）
+- 若 Spec 编写中暴露需求歧义或新发现约束，更新到项目规范防止后续重蹈
 
 ## 输出格式
 
@@ -119,13 +148,13 @@ Intent: [意图]
 Scope: [范围]
 Approach: [方向]
 
-## ADDED Requirements
+ADDED Requirements:
 ...
 
-## MODIFIED Requirements
+MODIFIED Requirements:
 ...
 
-## REMOVED Requirements
+REMOVED Requirements:
 ...
 
 ### Design
@@ -148,6 +177,17 @@ Approach: [方向]
 - Scenario使用Given/When/Then格式，可转化为自动化测试
 - 保持轻量：大多数变更使用Lite spec（简短需求+验收检查），高风险变更才用Full spec
 
+## 失败回退机制
+
+| 步骤                     | 失败条件                                        | 回退目标                                      | 最大重试 | 不可恢复时升级路径                             |
+| ------------------------ | ----------------------------------------------- | --------------------------------------------- | -------- | ---------------------------------------------- |
+| 第一步：明确意图（Proposal） | 用户需求过于模糊，无法提炼Intent/Scope/Approach | 列出2-3种理解，要求用户选择                   | 2        | 输出"需求澄清问卷"，等待用户补充后继续         |
+| 第二步：编写 Requirements（ADDED/MODIFIED/REMOVED） | Requirement过于宽泛，无法生成可测试Scenario     | 拆分为多个子Requirement，每个对应一个Scenario | 2        | 输出Requirement骨架，标注"待细化"，由用户补充  |
+| 第三步：编写Design（技术方案） | 技术方案与现有架构冲突                          | 输出冲突点 + 备选方案                         | 1        | 移交架构决策，输出Architecture Decision Record |
+| 第四步：生成Tasks（实现清单） | 任务依赖关系复杂，无法清晰分组为Wave            | 按文件维度分组，标注"粗粒度依赖"              | 1        | 输出依赖图，建议拆分为多个独立spec             |
+| 第五步：编码前Spec验证 | Scenario不可测试或Given/When/Then不完整         | 退回第二步修订Scenario                        | 2        | 输出"spec不完整"清单，建议人工补充后再编码     |
+| 第六步：记录到项目记忆 | 项目记忆系统不可用 | 输出Spec和Design到本地文件 | 1 | 标注"规格未沉淀"，提示用户手动保存 |
+
 ## 关联Skill
 
 - **任务拆解与执行** — spec完成后用 `任务拆解与执行` 将tasks转为可执行计划
@@ -157,8 +197,8 @@ Approach: [方向]
 
 ## 连接器（可选增强）
 
-| 连接器 | 增强能力 |
-|--------|---------|
-| **Filesystem** | 读取现有项目spec和代码结构 |
-| **Git** | 读取分支状态，辅助spec与实现的差异分析 |
-| **Notion** | 将需求规格文档写入 Notion 知识库 |
+| 连接器         | 增强能力                               |
+| -------------- | -------------------------------------- |
+| **Filesystem** | 读取现有项目spec和代码结构             |
+| **Git**        | 读取分支状态，辅助spec与实现的差异分析 |
+| **Notion**     | 将需求规格文档写入 Notion 知识库       |
