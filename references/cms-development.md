@@ -70,6 +70,10 @@
 
 ### 第三步：数据库操作规范
 
+#### 存储引擎
+
+默认 **InnoDB**（支持事务、行锁、崩溃恢复，与 `mysql-database.md` 对齐）；只有该 CMS 历史项目已大规模使用 MyISAM 且无事务需求时，才显式标注保留 MyISAM。
+
 #### 访问层优先级
 
 1. CMS 官方数据访问层（WP: `$wpdb` / TP: `Db` 类 / Laravel: Eloquent / ECMS: `$empire->query()`）
@@ -320,6 +324,7 @@ CMS 后台长任务必须优先采用 `Init → Step → Poll` 架构，禁止�
 ## 质量标准
 
 - 未确认 CMS 类型前禁止生成框架特定代码
+- 建表必须使用 InnoDB 引擎，MyISAM 仅在有明确 CMS 历史约束时保留
 - 必须使用 CMS 官方数据访问层，禁止原生 SQL 拼接
 - DECIMAL 金额字段禁止用 PHP float
 - 输出必须转义（XSS 防护）

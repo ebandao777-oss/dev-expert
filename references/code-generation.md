@@ -193,6 +193,7 @@ console.log(result);
 - **文档生成** — 生成后可用 `文档生成` 生成函数文档
 - **CMS二次开发** — PHP+MySQL CMS 场景参考 `cms-development.md` 的数据访问层和安全规范
 - **MySQL数据库** — 涉及表结构、SQL、索引、事务、慢查询和迁移时参考 `mysql-database.md`
+- **项目记忆管理** — 记录实现中的关键技术选择和新发现的编码规范
 
 ## 失败回退机制
 
