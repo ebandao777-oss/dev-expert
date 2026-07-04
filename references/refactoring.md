@@ -151,16 +151,9 @@
 
 ## 关联Skill
 
-- **Karpathy编码规范** — 重构后可用 `Karpathy编码规范` 检查是否过度设计
-- **代码审查** — 重构前可用 `代码审查` 全面评估代码问题
-- **测试用例生成** — 重构前可用 `测试用例生成` 生成基线测试保障安全
-- **代码生成** — 复杂重构可用 `代码生成` 生成替代实现
-- **项目记忆管理** — 记录重构决策、新增编码规范并更新架构文档
+- **karpathy-coding-guidelines**（Karpathy编码规范）— 重构后可用 `karpathy-coding-guidelines` 检查是否过度设计
+- **code-review**（代码审查）— 重构前可用 `code-review` 全面评估代码问题
+- **test-generation**（测试用例生成）— 重构前可用 `test-generation` 生成基线测试保障安全
+- **code-generation**（代码生成）— 复杂重构可用 `code-generation` 生成替代实现
+- **project-memory-management**（项目记忆管理）— 记录重构决策、新增编码规范并更新架构文档
 
-## 连接器（可选增强）
-
-| 连接器 | 增强能力 |
-|--------|---------|
-| **Filesystem** | 读取待重构代码和项目结构 |
-| **Git** | 读取版本历史，理解代码演进和重构必要性 |
-| **Notion** | 将重构方案和影响分析写入 Notion 知识库 |

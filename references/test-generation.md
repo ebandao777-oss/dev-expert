@@ -136,19 +136,12 @@
 
 ## 关联Skill
 
-- **前端设计** — 前端页面或组件测试需参考 `前端设计` 的交互状态、响应式断点和可访问性要求
-- **API设计** — API 和长任务测试需参考 `API设计` 的认证、错误码、分页和 Init-Step-Poll 契约
-- **CMS二次开发** — CMS/PHP 测试需参考 `CMS二次开发` 的权限、CSRF、输出转义和批处理规则
-- **MySQL数据库** — SQL 和性能测试需参考 `MySQL数据库` 的参数绑定、索引、事务和 EXPLAIN 标准
-- **代码审查** — 生成前可用 `代码审查` 确保被测代码逻辑正确
-- **Bug诊断** — 修复Bug后可用 `测试用例生成` 生成回归测试
-- **代码生成** — 生成代码后可用 `测试用例生成` 生成配套测试
-- **项目记忆管理** — 记录测试策略、Mock/Stub 约定和测试覆盖率基线
+- **frontend-design**（前端设计）— 前端页面或组件测试需参考 `frontend-design` 的交互状态、响应式断点和可访问性要求
+- **api-design**（API设计）— API 和长任务测试需参考 `api-design` 的认证、错误码、分页和 Init-Step-Poll 契约
+- **cms-development**（CMS二次开发）— CMS/PHP 测试需参考 `cms-development` 的权限、CSRF、输出转义和批处理规则
+- **mysql-database**（MySQL数据库）— SQL 和性能测试需参考 `mysql-database` 的参数绑定、索引、事务和 EXPLAIN 标准
+- **code-review**（代码审查）— 生成前可用 `code-review` 确保被测代码逻辑正确
+- **bug-diagnosis**（Bug诊断）— 修复Bug后可用 `test-generation` 生成回归测试
+- **code-generation**（代码生成）— 生成代码后可用 `test-generation` 生成配套测试
+- **project-memory-management**（项目记忆管理）— 记录测试策略、Mock/Stub 约定和测试覆盖率基线
 
-## 连接器（可选增强）
-
-| 连接器 | 增强能力 |
-|--------|---------|
-| **Filesystem** | 读取源代码，提取接口和边界条件生成测试 |
-| **Git** | 读取变更diff，生成针对性的回归测试 |
-| **Notion** | 将测试覆盖报告写入 Notion 知识库 |

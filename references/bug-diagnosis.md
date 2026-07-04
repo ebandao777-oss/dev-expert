@@ -145,13 +145,13 @@
 
 ## 关联Skill
 
-- **Karpathy编码规范** — 修复前可用 `Karpathy编码规范` 确认修复策略符合精准修改原则
-- **代码审查** — 修复后可用 `代码审查` 检查是否引入新问题
-- **测试用例生成** — 修复后可用 `测试用例生成` 生成回归测试
-- **代码生成** — 复杂修复可用 `代码生成` 生成替代实现
-- **CMS二次开发** — PHP+MySQL CMS 场景参考 `cms-development.md` 的兼容性检查和常见 Bug 模式
-- **MySQL数据库** — 数据库报错、慢查询、死锁、表结构和索引问题参考 `mysql-database.md`
-- **项目记忆管理** — 记录 Bug 根因、修复方案和预防措施
+- **karpathy-coding-guidelines**（Karpathy编码规范）— 修复前可用 `karpathy-coding-guidelines` 确认修复策略符合精准修改原则
+- **code-review**（代码审查）— 修复后可用 `code-review` 检查是否引入新问题
+- **test-generation**（测试用例生成）— 修复后可用 `test-generation` 生成回归测试
+- **code-generation**（代码生成）— 复杂修复可用 `code-generation` 生成替代实现
+- **cms-development**（CMS二次开发）— PHP+MySQL CMS 场景参考 `cms-development.md` 的兼容性检查和常见 Bug 模式
+- **mysql-database**（MySQL数据库）— 数据库报错、慢查询、死锁、表结构和索引问题参考 `mysql-database.md`
+- **project-memory-management**（项目记忆管理）— 记录 Bug 根因、修复方案和预防措施
 
 ## 失败回退机制
 
@@ -166,10 +166,3 @@
 | 第七步：定义成功标准（Goal-Driven Execution） | 修复涉及多系统联调，单次验证不充分 | 定义分层验证标准（单元→集成→端到端） | 1 | 给出回归测试checklist，建议灰度发布验证 |
 | 第八步：记录到项目记忆 | 项目记忆系统不可用 | 输出Decision Record到本地文件 | 1 | 标注"记忆未沉淀"，提示用户手动保存 |
 
-## 连接器（可选增强）
-
-| 连接器 | 增强能力 |
-|--------|---------|
-| **Filesystem** | 读取项目源代码和配置文件，定位bug根因 |
-| **Git** | 读取提交历史和diff，追溯问题引入时间点 |
-| **Notion** | 将诊断报告和修复方案写入 Notion 知识库 |

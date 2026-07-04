@@ -121,7 +121,7 @@ The system MUST [新行为描述].
 
 ```
 ⚠️ 未检测到spec。建议先完成spec对齐再编码。
-用 `Spec驱动开发` 生成spec，或提供已有spec。
+用 `spec-driven-development` 生成spec，或提供已有spec。
 ```
 
 **如有spec，作为编码依据**：
@@ -190,15 +190,8 @@ REMOVED Requirements:
 
 ## 关联Skill
 
-- **任务拆解与执行** — spec完成后用 `任务拆解与执行` 将tasks转为可执行计划
-- **代码生成** — 编码时用spec作为验收依据
-- **代码审查** — 审查时检查实现是否符合spec
-- **项目记忆管理** — 将spec和design决策记录到项目记忆
+- **task-decomposition-and-execution**（任务拆解与执行）— spec完成后用 `task-decomposition-and-execution` 将tasks转为可执行计划
+- **code-generation**（代码生成）— 编码时用spec作为验收依据
+- **code-review**（代码审查）— 审查时检查实现是否符合spec
+- **project-memory-management**（项目记忆管理）— 将spec和design决策记录到项目记忆
 
-## 连接器（可选增强）
-
-| 连接器         | 增强能力                               |
-| -------------- | -------------------------------------- |
-| **Filesystem** | 读取现有项目spec和代码结构             |
-| **Git**        | 读取分支状态，辅助spec与实现的差异分析 |
-| **Notion**     | 将需求规格文档写入 Notion 知识库       |

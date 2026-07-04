@@ -15,7 +15,7 @@
 
 - **如有spec**：逐条检查spec中的scenario是否被正确实现
 - **发现不一致**：标注spec与实现的偏差，建议修正spec或代码
-- **无spec**：提示建议在审查后使用 `Spec驱动开发` 补全spec
+- **无spec**：提示建议在审查后使用 `spec-driven-development` 补全spec
 
 ```
 ✓ Spec一致性检查:
@@ -188,15 +188,15 @@ Karpathy维度问题不纳入 severity 分级，单独标注为 **「Karpathy建
 
 ## 关联Skill
 
-- **代码生成** — 审查来自 `代码生成` 产出的代码时，重点验证生成是否偏离 Spec 约束和编码规范
-- **Karpathy编码规范** — 用 `Karpathy编码规范` 深入评估代码是否符合编码哲学
-- **前端设计** — 前端页面审查时参考 `前端设计` 的交互状态、响应式、可访问性和浏览器验证清单
-- **Bug诊断** — 审查发现的具体Bug可用 `Bug诊断` 深入分析根因
-- **重构建议** — 审查发现的代码异味可用 `重构建议` 获取详细重构方案
-- **测试用例生成** — 修复后可用 `测试用例生成` 补充回归测试
-- **CMS二次开发** — PHP+MySQL CMS 场景参考 `cms-development.md` 的安全红线和兼容性检查
-- **MySQL数据库** — 审查 SQL 注入、慢查询、索引滥用、事务边界和迁移风险时参考 `mysql-database.md`
-- **项目记忆管理** — 记录反复出现的坏味道、安全/性能问题修复模式和已知问题清单
+- **code-generation**（代码生成）— 审查来自 `code-generation` 产出的代码时，重点验证生成是否偏离 Spec 约束和编码规范
+- **karpathy-coding-guidelines**（Karpathy编码规范）— 用 `karpathy-coding-guidelines` 深入评估代码是否符合编码哲学
+- **frontend-design**（前端设计）— 前端页面审查时参考 `frontend-design` 的交互状态、响应式、可访问性和浏览器验证清单
+- **bug-diagnosis**（Bug诊断）— 审查发现的具体Bug可用 `bug-diagnosis` 深入分析根因
+- **refactoring**（重构建议）— 审查发现的代码异味可用 `refactoring` 获取详细重构方案
+- **test-generation**（测试用例生成）— 修复后可用 `test-generation` 补充回归测试
+- **cms-development**（CMS二次开发）— PHP+MySQL CMS 场景参考 `cms-development.md` 的安全红线和兼容性检查
+- **mysql-database**（MySQL数据库）— 审查 SQL 注入、慢查询、索引滥用、事务边界和迁移风险时参考 `mysql-database.md`
+- **project-memory-management**（项目记忆管理）— 记录反复出现的坏味道、安全/性能问题修复模式和已知问题清单
 
 ## 失败回退机制
 
@@ -211,10 +211,3 @@ Karpathy维度问题不纳入 severity 分级，单独标注为 **「Karpathy建
 | 第七步：生成修复建议   | 修复方案可能引入新问题           | 标注风险提示，建议回归测试范围                 | 2         | 输出修复建议+单元测试覆盖要求，由开发者自行实施          |
 | 第八步：记录到项目记忆 | 项目记忆系统不可用               | 输出审查报告和规范沉淀到本地文件               | 1         | 标注"审查结果未沉淀"，提示用户手动保存                   |
 
-## 连接器（可选增强）
-
-| 连接器         | 增强能力                               |
-| -------------- | -------------------------------------- |
-| **Filesystem** | 读取待审查代码和相关依赖文件           |
-| **Git**        | 读取diff和提交历史，辅助变更范围审查   |
-| **Notion**     | 将审查报告和整改清单写入 Notion 知识库 |

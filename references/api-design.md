@@ -15,7 +15,7 @@
 设计前检查是否有明确的spec：
 
 - **如有spec**：提取spec中的Requirement和Scenario作为接口设计依据，确保每个Requirement对应至少一个端点，每个Scenario映射为接口的成功/错误响应
-- **如无spec**：提示用户先使用 `Spec驱动开发` 对齐需求，或基于业务需求生成轻量级spec
+- **如无spec**：提示用户先使用 `spec-driven-development` 对齐需求，或基于业务需求生成轻量级spec
 
 ```
 ✓ Spec场景检查: [检测到/未检测到] 需求规格
@@ -75,6 +75,20 @@ The system SHALL provide an endpoint to [功能描述].
 - `[API定义文件]` (new/modified)
 
 ```
+
+#### 规范验证（必填）
+
+API规范定义完成后，必须完成以下验证才能进入文档生成：
+
+- [ ] **契约一致性**：每个 Requirement 至少有一个 Scenario 覆盖，Scenario 的 Given/When/Then 完整
+- [ ] **错误码完备**：每个端点定义了成功和至少一类错误场景的错误码
+- [ ] **认证/授权**：需要鉴权的端点标注了认证方式和所需权限
+- [ ] **分页/限流**：列表端点定义了分页参数和限流策略
+- [ ] **幂等性**：写操作标注了是否幂等，非幂等操作定义了重试策略
+- [ ] **命名规范**：路径、字段、错误码遵循统一命名规范（如 snake_case / camelCase）
+- [ ] **长任务契约**：耗时操作采用 Init-Step-Poll 模式，定义了任务ID、进度查询端点和超时策略
+
+如某项无法验证，必须在文档生成时标注"未验证项"，不得跳过。
 
 ### 第六步：文档生成
 
@@ -172,16 +186,9 @@ API 设计完成后，将关键决策和规范记录到项目记忆（参见 `pr
 
 ## 关联Skill
 
-- **技术选型** — 设计前可用 `技术选型` 确定API技术方案（REST/GraphQL/gRPC）
-- **代码生成** — 设计后可用 `代码生成` 生成API接口代码
-- **测试用例生成** — 设计后可用 `测试用例生成` 生成API测试
-- **文档生成** — 设计后可用 `文档生成` 生成API文档
-- **项目记忆管理** — 记录 API 设计决策、接口命名约定和版本策略
+- **tech-selection**（技术选型）— 设计前可用 `tech-selection` 确定API技术方案（REST/GraphQL/gRPC）
+- **code-generation**（代码生成）— 设计后可用 `code-generation` 生成API接口代码
+- **test-generation**（测试用例生成）— 设计后可用 `test-generation` 生成API测试
+- **doc-generation**（文档生成）— 设计后可用 `doc-generation` 生成API文档
+- **project-memory-management**（项目记忆管理）— 记录 API 设计决策、接口命名约定和版本策略
 
-## 连接器（可选增强）
-
-| 连接器 | 增强能力 |
-|--------|---------|
-| **Filesystem** | 读取现有项目代码结构和接口定义，辅助设计一致性 |
-| **Git** | 读取版本历史和变更记录，理解API演进路径 |
-| **Notion** | 将API设计文档写入 Notion 知识库，便于团队评审 |
