@@ -171,6 +171,46 @@ console.log(result);
 3. [注意事项3：如后续优化方向]
 ````
 
+## 实战请求示例
+
+下面示例用于指导用户把需求说清楚，避免只给一句“帮我写个功能”导致反复澄清。
+
+### 示例一：后台列表接口
+
+```text
+帮我实现一个订单列表接口。
+语言/框架：PHP 8.2，Laravel 10。
+输入：page、page_size、status、keyword。
+输出：订单列表、总数、分页信息。
+约束：page_size 最大 100；keyword 搜索订单号和手机号；所有外部输入必须校验；SQL 不能拼接。
+验证：给出 Feature Test，覆盖正常分页、非法 page_size、keyword 模糊搜索。
+```
+
+生成时应优先加载：`laravel-development.md`、`mysql-database.md`、`test-generation.md`。
+
+### 示例二：CMS 批量任务
+
+```text
+帮我给帝国CMS后台做一个批量刷新文章缓存功能。
+环境：EmpireCMS 7.5，PHP 8.2。
+要求：不能单请求跑完，必须 Init-Step-Poll；每批 50 条；前端显示进度、失败数和重试按钮。
+安全：后台权限校验、CSRF 校验、输出转义。
+验证：给出 Init、Step、Poll 的响应示例和手动测试步骤。
+```
+
+生成时应优先加载：`cms-development.md`、`api-design.md`、`frontend-design.md`；进入验证设计时再切换到 `test-generation.md`，避免一次加载超过 3 个 reference。
+
+### 示例三：小工具脚本
+
+```text
+帮我写一个 Python 脚本，扫描目录下所有 .md 文件，统计标题数量和断链数量。
+约束：Python 3.10+，只读文件，不修改；跳过 node_modules、vendor、.git。
+输出：表格形式打印文件、标题数、断链数；退出码 0 表示无断链，1 表示存在断链。
+验证：给出最小样例目录和运行命令。
+```
+
+生成时应优先加载：`code-generation.md`，如涉及性能再协同 `performance-benchmark.md`。
+
 ## 质量标准
 
 - 生成的代码必须可直接运行，不能是伪代码
@@ -218,4 +258,3 @@ console.log(result);
 | 第六步：代码审查       | 内联审查发现逻辑缺陷               | 退回第四步重新设计方案                 | 2        | 触发 code-review.md 完整审查流程                   |
 | 第七步：补充说明（Goal-Driven） | 成功标准无法量化或验证方法不可行   | 提供定性验证建议，标注"待量化"         | 2        | 输出验证骨架，建议用户补充具体验收条件             |
 | 第八步：记录到项目记忆 | 项目记忆系统不可用                 | 输出Decision Record到本地文件          | 1        | 标注"决策未沉淀"，提示用户手动保存                 |
-

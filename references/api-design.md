@@ -103,6 +103,33 @@ API 设计完成后，将关键决策和规范记录到项目记忆（参见 `pr
 - 记录接口命名约定和版本策略
 - 记录认证/授权方案的选型依据
 
+## 实战请求示例
+
+### 示例一：分页查询接口
+
+```text
+帮我设计一个订单列表 API。
+资源：orders。
+查询条件：page、page_size、status、keyword、created_start、created_end。
+权限：只有后台运营可访问；普通用户不能访问。
+要求：分页最大 100；错误响应要有 code/message；keyword 支持订单号和手机号。
+验证：给出正常请求、非法 page_size、无权限访问的响应示例。
+```
+
+优先加载：`api-design.md`、`mysql-database.md`、`test-generation.md`。
+
+### 示例二：长任务导出接口
+
+```text
+帮我设计一个订单导出 API，数据量可能超过 10 万。
+要求：不能单请求同步导出，必须 Init-Step-Poll；支持进度、失败原因、取消和重试。
+权限：只有管理员可导出；导出文件 24 小时后过期。
+前端：需要轮询字段和错误提示文案。
+验证：给出 Init、Step、Poll、Cancel 的请求/响应示例。
+```
+
+优先加载：`api-design.md`、`frontend-design.md`、`test-generation.md`。
+
 ## 输出格式
 
 ````
@@ -191,4 +218,3 @@ API 设计完成后，将关键决策和规范记录到项目记忆（参见 `pr
 - **test-generation**（测试用例生成）— 设计后可用 `test-generation` 生成API测试
 - **doc-generation**（文档生成）— 设计后可用 `doc-generation` 生成API文档
 - **project-memory-management**（项目记忆管理）— 记录 API 设计决策、接口命名约定和版本策略
-

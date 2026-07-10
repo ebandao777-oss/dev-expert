@@ -71,6 +71,34 @@
 - 记录 Mock/Stub 约定和命名规范
 - 更新测试覆盖率基线，作为后续测试的质量参考
 
+## 实战请求示例
+
+### 示例一：接口功能测试
+
+```text
+帮我给登录接口生成测试用例。
+框架：Laravel Feature Test / PHPUnit。
+接口：POST /api/login。
+输入：email、password。
+覆盖：成功登录、密码错误、邮箱格式错误、账号禁用、频率限制。
+安全：断言不会返回 password_hash、token 只在成功时返回。
+验证：给出测试文件路径、运行命令和预期通过数。
+```
+
+优先加载：`test-generation.md`、`api-design.md`、`laravel-testing.md`。
+
+### 示例二：长任务测试
+
+```text
+帮我给批量刷新缓存任务生成测试。
+架构：Init-Step-Poll。
+覆盖：Init 返回 task_id；Step 每批 50 条；Poll 返回 percent；失败可重试；取消后不能继续执行。
+边界：空数据、超大数据、重复 Step、无权限访问。
+验证：给出单元测试和手动接口测试步骤。
+```
+
+优先加载：`test-generation.md`、`api-design.md`、`cms-development.md`。
+
 ## 输出格式
 
 ```
@@ -144,4 +172,3 @@
 - **bug-diagnosis**（Bug诊断）— 修复Bug后可用 `test-generation` 生成回归测试
 - **code-generation**（代码生成）— 生成代码后可用 `test-generation` 生成配套测试
 - **project-memory-management**（项目记忆管理）— 记录测试策略、Mock/Stub 约定和测试覆盖率基线
-

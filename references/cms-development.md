@@ -287,6 +287,32 @@ CMS 后台长任务必须优先采用 `Init → Step → Poll` 架构，禁止�
 - 记录安全加固措施和已知兼容性问题
 - 记录插件/模块的目录结构和命名约定
 
+## 实战请求示例
+
+### 示例一：后台管理功能
+
+```text
+帮我给 WordPress 后台加一个订单备注管理页。
+环境：WordPress 6.x，PHP 8.2，MySQL 8.0。
+功能：按订单号搜索备注；新增/编辑备注；记录操作人和时间。
+安全：使用 $wpdb prepare；后台权限校验；状态变更加 nonce；输出转义。
+验证：给出数据库表结构、后台菜单入口、手动测试步骤和 PHP lint 命令。
+```
+
+优先加载：`cms-development.md`、`mysql-database.md`、`code-generation.md`。
+
+### 示例二：帝国CMS 批量处理
+
+```text
+帮我给帝国CMS 7.5 做一个批量同步文章状态的后台工具。
+环境：PHP 8.2，表前缀 phome_。
+要求：先探测 CMS 和 PHP 版本；不能单请求跑完；必须 Init-Step-Poll；每批 100 条。
+安全：后台登录态、权限、CSRF、输出转义；禁止直接改缓存文件。
+验证：给出 Init/Step/Poll 响应示例、错误日志检查路径和清缓存说明。
+```
+
+优先加载：`cms-development.md`、`api-design.md`、`test-generation.md`。
+
 ## 输出格式
 
 ```markdown

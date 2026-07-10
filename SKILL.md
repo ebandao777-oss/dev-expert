@@ -1,8 +1,8 @@
 ---
 name: dev-expert
 description: |
-  编程专家综合技能套件，含 18 个子技能：软件项目总控、网站项目总控、API设计、Bug诊断、代码生成、代码审查、重构建议、测试用例生成、性能基准测试、技术选型、文档生成、任务拆解与执行、Spec驱动开发、Karpathy编码规范、项目记忆管理、CMS二次开发、前端设计、MySQL数据库。按用户输入关键词路由到对应子技能模板执行，支持 `@英文标识` 显式调用跳过路由匹配。关键词路由表、领域路由表、优先级矩阵和子技能索引见 SKILL.md 主体。
-version: "1.7.0"
+  编程专家综合技能套件，含 18 个子技能：软件项目总控、网站项目总控、API设计、Bug诊断、代码生成、代码审查、重构建议、测试用例生成、性能基准测试、技术选型、文档生成、任务拆解与执行、Spec驱动开发、Karpathy编码规范、项目记忆管理、CMS二次开发、前端设计、MySQL数据库。按用户输入关键词路由到对应子技能模板执行，支持 `@英文标识` 显式调用跳过路由匹配；Laravel/PHP、Java/Spring 框架能力以专项 reference 方式按需加载，不新增子技能标识。关键词路由表、领域路由表、优先级矩阵和子技能索引见 SKILL.md 主体。
+version: "1.7.9"
 author: "智慧半岛"
 license: MIT
 allowed-tools:
@@ -26,7 +26,7 @@ allowed-tools:
 
 #### 1.1 恢复历史记忆（新会话强制执行）
 
-新会话首次响应前，必须调用 `project-memory-management` 第四步"新会话记忆恢复"，按三层加载策略恢复历史上下文：
+新会话首次响应前，必须调用 `project-memory-management` 第五步"新会话记忆恢复"，按三层加载策略恢复历史上下文：
 
 1. **探测根目录**：按 `project-memory-management` 的"路径根目录探测协议"动态获取 `{PROJECT_ROOT}`（项目根目录，优先级：环境变量 > Git 根目录 > IDE 工作区 > 询问用户）和 `{USER_PROFILE}`（用户主目录），**严禁硬编码路径**
 2. **Layer 1 Metadata（~50 tokens，始终加载）**：读取 `{PROJECT_ROOT}/.ai-memory/{YYYYMMDD}/topics.md`，获取项目名称、当前阶段、活跃任务、上次会话日期
@@ -180,23 +180,35 @@ allowed-tools:
 
 领域路由用于在关键词命中后进一步确认首选 reference，避免只按单词匹配导致误路由。先判断任务领域，再选择主模板；需要跨领域时按协同模板顺序补充加载。
 
-| 领域             | 触发信号                                                  | 首选 reference                          | 协同 reference                                       | 路由边界                                                                |
-| ---------------- | --------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------- |
-| 代码实现         | 实现功能、补接口、写脚本、改逻辑、生成代码                | `code-generation`                       | `karpathy-coding-guidelines`, `test-generation`      | 如果需求未对齐或涉及完整项目，先转 `spec-driven-development` 或项目总控 |
-| Bug 诊断         | 报错、异常、堆栈、日志、复现失败、运行时行为不符          | `bug-diagnosis`                         | `code-review`, `test-generation`                     | 未读错误和上下文前不得直接改代码                                        |
-| 代码审查         | review、审查、缺陷、安全风险、性能问题、可维护性          | `code-review`                           | `karpathy-coding-guidelines`, `refactoring`          | 以发现问题为主，不默认重写实现                                          |
-| 重构治理         | 重构、坏味道、结构混乱、重复代码、可维护性提升            | `refactoring`                           | `test-generation`, `code-review`                     | 未建立验证路径前不得扩大重构范围                                        |
-| 测试补强         | 单元测试、集成测试、回归测试、边界用例、覆盖率            | `test-generation`                       | `code-generation`, `bug-diagnosis`                   | 先确认被测行为和预期结果                                                |
-| 性能验证         | profiler、火焰图、benchmark、cProfile、耗时分析、内存分析 | `performance-benchmark`                 | `code-review`, `refactoring`, `mysql-database`       | 先明确性能指标和阈值，不得无基线声称"显著提升"                          |
-| 文档交付         | README、API 文档、部署说明、回滚说明、技术文档            | `doc-generation`                        | `software-project`, `api-design`                     | 文档不得替代实际验证证据                                                |
-| API / 长任务接口 | REST、GraphQL、接口契约、AJAX、Init-Step-Poll、轮询       | `api-design`                            | `frontend-design`, `cms-development`                 | 长任务必须采用 Init-Step-Poll 架构                                      |
-| CMS / PHP        | CMS、EmpireCMS、WordPress、ThinkPHP、PHP8兼容、插件、模板 | `cms-development`                       | `mysql-database`, `bug-diagnosis`, `code-generation` | 未确认 CMS 类型前禁止生成框架特定代码                                   |
-| MySQL / 数据库   | 表结构、SQL、索引、事务、慢查询、EXPLAIN、迁移、回滚      | `mysql-database`                        | `cms-development`, `software-project`                | 写操作必须先确认影响范围和回滚路径                                      |
-| 前端 / 视觉      | UI、UX、页面、响应式、品牌、Banner、图标、浏览器验证      | `frontend-design`                       | `code-generation`, `website-project`                 | 先输出设计约束，再进入实现                                              |
-| 项目总控         | 完整功能、项目交付、上线、发布、运维、监控、巡检          | `software-project` 或 `website-project` | `task-decomposition-and-execution`, `doc-generation` | 先定边界、验收和发布回滚，再拆任务                                      |
-| 项目记忆         | 项目记忆、上下文恢复、决策记录、规范沉淀、继续上一轮      | `project-memory-management`             | 当前主任务 reference                                 | 项目记忆只辅助主任务，不替代主任务交付                                  |
+| 领域              | 触发信号                                                                                                 | 首选 reference                          | 协同 reference                                                               | 路由边界                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 代码实现          | 实现功能、补接口、写脚本、改逻辑、生成代码                                                               | `code-generation`                       | `karpathy-coding-guidelines`, `test-generation`                              | 如果需求未对齐或涉及完整项目，先转 `spec-driven-development` 或项目总控 |
+| Bug 诊断          | 报错、异常、堆栈、日志、复现失败、运行时行为不符                                                         | `bug-diagnosis`                         | `code-review`, `test-generation`                                             | 未读错误和上下文前不得直接改代码                                        |
+| 代码审查          | review、审查、缺陷、安全风险、性能问题、可维护性                                                         | `code-review`                           | `karpathy-coding-guidelines`, `refactoring`                                  | 以发现问题为主，不默认重写实现                                          |
+| 重构治理          | 重构、坏味道、结构混乱、重复代码、可维护性提升                                                           | `refactoring`                           | `test-generation`, `code-review`                                             | 未建立验证路径前不得扩大重构范围                                        |
+| 测试补强          | 单元测试、集成测试、回归测试、边界用例、覆盖率                                                           | `test-generation`                       | `code-generation`, `bug-diagnosis`                                           | 先确认被测行为和预期结果                                                |
+| 性能验证          | profiler、火焰图、benchmark、cProfile、耗时分析、内存分析                                                | `performance-benchmark`                 | `code-review`, `refactoring`, `mysql-database`                               | 先明确性能指标和阈值，不得无基线声称"显著提升"                          |
+| 文档交付          | README、API 文档、部署说明、回滚说明、技术文档                                                           | `doc-generation`                        | `software-project`, `api-design`                                             | 文档不得替代实际验证证据                                                |
+| API / 长任务接口  | REST、GraphQL、接口契约、AJAX、Init-Step-Poll、轮询                                                      | `api-design`                            | `frontend-design`, `cms-development`                                         | 长任务必须采用 Init-Step-Poll 架构                                      |
+| Laravel / PHP框架 | Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUnit、PHPStan                      | `laravel-development`                   | `code-generation`, `test-generation`, `laravel-testing`, `mysql-database`    | 仅在确认 Laravel 项目后加载；不得套用到未确认框架的 CMS 项目            |
+| Java / Spring     | Java、Spring Boot、Spring、MyBatis、Hibernate、JPA、Maven、Gradle、JUnit、Mockito、JVM、GC、线程池、并发 | `java-development`                      | `code-generation`, `code-review`, `test-generation`, `performance-benchmark` | 仅在确认 Java 项目后加载；Java 17/21 特性必须先确认运行版本支持         |
+| CMS / PHP         | CMS、EmpireCMS、WordPress、ThinkPHP、PHP8兼容、插件、模板                                                | `cms-development`                       | `mysql-database`, `bug-diagnosis`, `code-generation`                         | 未确认 CMS 类型前禁止生成框架特定代码                                   |
+| MySQL / 数据库    | 表结构、SQL、索引、事务、慢查询、EXPLAIN、迁移、回滚                                                     | `mysql-database`                        | `cms-development`, `software-project`                                        | 写操作必须先确认影响范围和回滚路径                                      |
+| 前端 / 视觉       | UI、UX、页面、响应式、品牌、Banner、图标、浏览器验证                                                     | `frontend-design`                       | `code-generation`, `website-project`                                         | 先输出设计约束，再进入实现                                              |
+| 项目总控          | 完整功能、项目交付、上线、发布、运维、监控、巡检                                                         | `software-project` 或 `website-project` | `task-decomposition-and-execution`, `doc-generation`                         | 先定边界、验收和发布回滚，再拆任务                                      |
+| 项目记忆          | 项目记忆、上下文恢复、决策记录、规范沉淀、继续上一轮                                                     | `project-memory-management`             | 当前主任务 reference                                                         | 项目记忆只辅助主任务，不替代主任务交付                                  |
 
 领域路由后仍必须执行意图三分法和澄清策略分级：信息查询只读回答，简单任务可进快速通道，复杂任务先方案确认。
+
+### 专项 reference 映射
+
+以下专项 reference 只作为领域协同资料按需加载，不加入 `@英文标识` 显式调用索引，也不计入 18 个子技能数量。领域路由命中这些标识时，必须按下表读取真实文件路径，禁止依赖裸标识自行推断。
+
+| 专项 reference        | 文件                                                                     |
+| --------------------- | ------------------------------------------------------------------------ |
+| `laravel-development` | [references/laravel-development.md](./references/laravel-development.md) |
+| `laravel-testing`     | [references/laravel-testing.md](./references/laravel-testing.md)         |
+| `java-development`    | [references/java-development.md](./references/java-development.md)       |
 
 ## 子技能索引
 
@@ -242,7 +254,13 @@ allowed-tools:
 | "CMS二次开发" + "写代码"                               | CMS二次开发 + 代码生成           | CMS规范优先，代码生成遵循CMS数据访问层和安全红线                                  |
 | "帝国CMS/WordPress" + "报错"                           | Bug诊断                          | CMS关键词触发Bug诊断时自动加载CMS常见Bug模式                                      |
 | "PHP" + "代码审查"                                     | 代码审查 + CMS二次开发(自动)     | 审查PHP代码时自动追加CMS安全审查清单                                              |
+| "Laravel/Eloquent/Blade/artisan" + "写代码/改功能"     | 代码生成 + Laravel专项参考       | Laravel 框架约定优先，按需加载 `laravel-development`                              |
+| "Laravel/PHPUnit/Pest/Feature Test" + "测试"           | 测试用例生成 + Laravel测试参考   | Laravel 测试优先使用 Feature Test、Factory、Facade fake 和数据库断言              |
+| "Java/Spring Boot/MyBatis/JPA" + "写代码/改功能"       | 代码生成 + Java专项参考          | Java/Spring 分层、事务、数据访问和异常处理规则优先，按需加载 `java-development`   |
+| "Java/JVM/GC/线程池/并发" + "性能/调优"                | 性能基准测试 + Java专项参考      | JVM 与并发问题必须先采集耗时、GC、线程、堆或连接池证据                            |
+| "Java/JUnit/Mockito/Spring Boot Test" + "测试"         | 测试用例生成 + Java专项参考      | Java 测试优先区分单元测试、切片测试、集成测试和外部依赖替身                       |
 | "MySQL/数据库/SQL/索引/慢查询/EXPLAIN"                 | MySQL数据库                      | 数据结构、SQL安全和性能问题优先走数据库专项模板                                   |
+| "代码优化/性能优化/架构优化/N+1/缓存/异步/性能瓶颈"    | 性能基准测试 + 代码审查          | 先按性能反模式静态扫描定位嫌疑点，再用 benchmark/profile/EXPLAIN 验证             |
 | "PHP/CMS" + "数据库/SQL"                               | CMS二次开发 + MySQL数据库        | 先确认CMS访问层和表前缀，再进行SQL/索引/迁移设计                                  |
 | "部署/发布/上线/回滚/运维/监控/告警/巡检"              | 软件项目总控 + 文档生成          | 发布运维类请求必须输出发布步骤、回滚方案、观测指标、告警和巡检清单                |
 | "前端/页面/UI" + "设计"                                | 前端设计                         | 视觉、交互、响应式和可访问性优先于直接写代码                                      |
@@ -271,6 +289,9 @@ allowed-tools:
 - 需求→实现：Spec驱动开发 → 任务拆解与执行 → 代码生成 → 代码审查 → 性能基准测试 → 测试用例生成 → 文档生成
 - 页面→实现：前端设计 → 代码生成 → 代码审查 → 性能基准测试 → 测试用例生成 → 文档生成
 - CMS页面→实现：CMS二次开发 → 前端设计(含浏览器验证) → 代码生成 → 代码审查 → 测试用例生成
+- Laravel功能→实现：Laravel专项参考 → 代码生成/API设计/MySQL数据库 → 代码审查 → 测试用例生成 + Laravel测试参考 → 文档生成
+- Java功能→实现：Java专项参考 → 代码生成/API设计/MySQL数据库 → 代码审查 → 测试用例生成 → 性能基准测试/文档生成
+- 代码优化→验证：代码审查(性能反模式) → 性能基准测试(L0/L1/L2) → MySQL数据库/重构建议 → 测试用例生成 → 项目记忆管理
 - 治理→沉淀：Bug诊断/重构建议 → 代码审查 → Karpathy编码规范 → 项目记忆管理
 
 ## 跨技能协同指引
@@ -371,15 +392,41 @@ allowed-tools:
 
 各子技能的失败回退机制必须遵循以下基线，避免重试数不一致导致无限循环或过早放弃：
 
-| 失败类型     | 默认最大重试 | 说明                                   |
-| ------------ | ------------ | -------------------------------------- |
-| 安全/数据类  | 0            | 安全漏洞、数据丢失风险，立即升级不重试 |
-| Lint/语法类  | 3            | 语法错误、格式问题，可多次尝试修复     |
-| 验证类失败   | 2            | 测试未通过、构建失败，默认 2 次        |
-| 环境类失败   | 1            | 环境不可用、依赖缺失，重试 1 次后升级  |
-| 业务规则不明 | 0            | 不得凭猜测重试，立即向用户索取输入     |
+| 失败类型        | 默认最大重试 | 说明                                                              |
+| --------------- | ------------ | ----------------------------------------------------------------- |
+| 安全/数据类     | 0            | 安全漏洞、数据丢失风险，立即升级不重试                            |
+| Lint/语法类     | 3            | 语法错误、格式问题，可多次尝试修复                                |
+| 验证类失败      | 2            | 测试未通过、构建失败，默认 2 次                                   |
+| 环境类失败      | 1            | 环境不可用、依赖缺失，重试 1 次后升级                             |
+| 业务规则不明    | 0            | 不得凭猜测重试，立即向用户索取输入                                |
+| 网络/远程服务类 | 2            | 网络卡顿、请求超时、临时 5xx 可间隔重试；涉及写操作前必须确认幂等 |
 
 各 reference 的「失败回退机制」表中如出现与基线冲突的最大重试数，以本基线为准；reference 可在基线范围内细化，但不得超过上限。
+
+#### 错误提示可读性规则
+
+当执行失败、命令报错、测试不通过或触发安全闸门时，必须同时输出“技术说明”和“普通人可读说明”，避免只给专业术语：
+
+| 输出项           | 要求                                                                 |
+| ---------------- | -------------------------------------------------------------------- |
+| 发生了什么       | 用一句话说明失败点，例如“测试没有通过，因为登录接口返回了 500”       |
+| 可能原因         | 列 1-3 个候选原因，标注“已确认”或“待验证”                            |
+| 修复方向         | 给出下一步最小动作，例如“先看错误日志第 X 行”或“先补数据库字段”      |
+| 风险提醒         | 若涉及生产配置、数据库写入、权限、凭证、不可回滚操作，必须先请求确认 |
+| 需要用户提供什么 | 只在确实缺少输入时提出，格式为“需 [角色] 提供 [具体输入]”            |
+
+禁止只输出“报错了/失败了/环境问题/请检查配置”这类不可执行提示。
+
+#### 网络重试规则
+
+网络卡顿、远程接口超时、下载依赖失败、外部 API 返回临时 5xx 时，允许最多 2 次自动重试；每次重试前必须说明原因和等待策略。以下情况不得自动重试：
+
+- 请求会产生写入、副作用、扣费、发消息、发邮件、发布上线等不可安全重复操作
+- 返回 4xx、权限失败、参数校验失败、业务规则失败
+- 用户已要求暂停、停止或只报告状态
+- 重试需要新增凭证、修改生产配置或绕过安全校验
+
+重试后仍失败时，输出当前状态、已尝试次数、最后一次错误摘要和可选下一步，不得静默继续扩大执行范围。
 
 #### 对话流异常处理边界
 
@@ -439,4 +486,4 @@ allowed-tools:
 
 ## 常见问题答疑（FAQ）
 
-常见疑问、执行禁区清单、验证失败处置、边界外请求和显式调用答疑集中维护在 [references/faq.md](./references/faq.md)。遇到不确定情况时优先查阅该文件。
+常见疑问、执行禁区清单、验证失败处置、边界外请求和显式调用答疑集中维护在 [FAQ.md](./FAQ.md)。遇到不确定情况时优先查阅该文件。
