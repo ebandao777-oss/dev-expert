@@ -86,7 +86,7 @@ API规范定义完成后，必须完成以下验证才能进入文档生成：
 - [ ] **分页/限流**：列表端点定义了分页参数和限流策略
 - [ ] **幂等性**：写操作标注了是否幂等，非幂等操作定义了重试策略
 - [ ] **命名规范**：路径、字段、错误码遵循统一命名规范（如 snake_case / camelCase）
-- [ ] **长任务契约**：耗时操作采用 Init-Step-Poll 模式，定义了任务ID、进度查询端点和超时策略
+- [ ] **长任务契约**：耗时操作采用 Init-Step-Poll 模式，定义了任务ID、进度查询端点、取消端点和超时策略
 
 如某项无法验证，必须在文档生成时标注"未验证项"，不得跳过。
 
@@ -180,9 +180,10 @@ API 设计完成后，将关键决策和规范记录到项目记忆（参见 `pr
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
-| `/tasks/{type}/init` | POST | 创建任务，返回 `task_id`、`total`、初始状态 |
+| `/tasks/{type}/init` | POST | 创建任务，返回 `task_id`、`total`、初始状态 `queued` |
 | `/tasks/{task_id}/step` | POST | 执行一批处理，返回进度和 `has_more` |
 | `/tasks/{task_id}/poll` | GET | 查询任务状态、进度、错误和结果 |
+| `/tasks/{task_id}/cancel` | POST | 标记任务取消，返回 `status=cancelled`；正在执行的 Step 在下一批次检测取消标记后优雅退出 |
 
 **Step 响应必须包含**：`task_id`, `status`, `processed`, `total`, `percent`, `has_more`, `message`, `errors`
 

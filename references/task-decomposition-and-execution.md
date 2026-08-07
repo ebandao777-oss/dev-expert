@@ -50,6 +50,17 @@
 </task>
 ```
 
+**长任务需求专项拆解**：若需求含"批量导入/导出/生成静态页/重建索引/采集同步/清理缓存/>3 秒或 >100 条处理"，不得按单端点单任务拆解，必须按 `Init → Step → Poll` 拆成依赖有序的 Wave：
+
+- **Wave 1（Init）**：校验权限/CSRF/参数，创建任务记录，计算总量 → 返回 `task_id`、`total`、`status=queued`
+- **Wave 2（Step）**：每批 20-100 条，更新进度、持久化状态、检测取消标记、幂等（用 `last_id`/游标保证每批唯一）
+- **Wave 3（Poll）**：查状态/进度/错误，检测僵尸任务（`running` 超阈值标记 `failed` 或允许 `resume`）
+- **Wave 4（Cancel）**：标记取消，正在执行的 Step 在下一批次检测取消标记后优雅退出
+- **Wave 5（前端轮询交互）**：`Init/Step/Poll/Done/Failed/Cancelled` 状态、轮询间隔 800-2000ms、重试/取消入口、进度感知
+- **Wave 6（长任务测试）**：Init/Step/Poll/失败重试/取消/超时/幂等全覆盖
+
+各 Wave 间存在依赖（Step 依赖 Init 的任务记录，Poll 依赖 Step 的进度），必须串行；权限/CSRF/文件/SQL 等安全触发面须在每 Wave 的 `<security>` 写明验证方法。
+
 ### 第三步：Wave分组
 
 按依赖关系将任务分组：

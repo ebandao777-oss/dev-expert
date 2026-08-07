@@ -2,7 +2,7 @@
 name: dev-expert
 description: |
   编程专家综合技能套件，含 18 个子技能：软件项目总控、网站项目总控、API设计、Bug诊断、代码生成、代码审查、重构建议、测试用例生成、性能基准测试、技术选型、文档生成、任务拆解与执行、Spec驱动开发、Karpathy编码规范、项目记忆管理、CMS二次开发、前端设计、MySQL数据库。按用户输入关键词路由到对应子技能模板执行，支持 `@英文标识` 显式调用跳过路由匹配；Laravel/PHP、Java/Spring 框架能力以专项 reference 方式按需加载，不新增子技能标识。关键词路由表、领域路由表、优先级矩阵和子技能索引见 SKILL.md 主体。
-version: "1.7.9"
+version: "1.7.10"
 author: "智慧半岛"
 license: MIT
 allowed-tools:

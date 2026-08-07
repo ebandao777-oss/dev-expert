@@ -203,6 +203,7 @@ CMS 后台长任务必须优先采用 `Init → Step → Poll` 架构，禁止�
 | Init | 校验权限/CSRF/参数，创建任务记录，计算总量 | `task_id`, `total`, `status=queued`         |
 | Step | 每次只处理一小批数据，更新进度和错误列表   | `processed`, `total`, `percent`, `has_more` |
 | Poll | 前端轮询任务状态，不执行重业务逻辑         | `status`, `percent`, `message`, `errors`    |
+| Cancel | 标记任务取消，不立即杀进程                 | `status=cancelled`，正在执行的 Step 在下一批次检测取消标记后退出 |
 
 **实现约束**：
 
@@ -212,6 +213,8 @@ CMS 后台长任务必须优先采用 `Init → Step → Poll` 架构，禁止�
 - 状态变更必须校验登录态、权限和 CSRF Token
 - 错误必须记录到任务错误列表，允许部分失败后继续处理
 - 前端必须显示进度、当前批次、失败数、重试/取消入口
+- Step 每批次开始必须检测取消标记，若已取消则停止处理并标记 `status=cancelled`，不允许继续执行剩余批次
+- 僵尸检测：Poll 发现 `status=running` 且 `updated_at` 超过阈值（建议 2× 单批预估耗时或固定如 30 分钟）无更新，标记为 `failed`（僵尸）或允许客户端 `resume` 重跑未完成批次；前端据此展示"任务疑似中断，可重试"
 - Poll 间隔建议 800-2000ms，连续失败 3 次后停止并提示
 
 **最小响应示例**：

@@ -81,9 +81,14 @@ Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUni
 
 ## 版本
 
-v1.7.9 | 更新日期: 2026-07-10
+v1.7.10 | 更新日期: 2026-08-07
 
 ## 变更日志
+
+### v1.7.10 (2026-08-07)
+
+- 全包完整性审计：18 个子技能 reference + 3 个专项 reference（laravel-development / laravel-testing / java-development）全部齐备；SKILL.md / README.md / FAQ.md 中全部 `references/*.md` 链接零断链；主流程 6 步跨文件引用的 7 处步骤号（software-project 第六步、code-generation 第六步、bug-diagnosis 第七步、website-project 第七步、frontend-design 第九步、cms-development 第八步、project-memory-management 第五步）全部命中目标文件；18 个子技能均含「失败回退机制」表——任务可端到端执行交付，无断点。
+- 子任务质量审计：18 个子技能均具备「输入要求 / 输出格式 / 质量标准 / 失败回退机制」四大质量支柱；质量标准为可核查硬约束（api-design 7 项规范验证清单、test-generation 强制安全/性能/长任务覆盖、bug-diagnosis 根因须有验证证据且禁止猜测）；跨子技能质量协同一致（Spec 前置闸门、Karpathy 精准修改、Init-Step-Poll 长任务契约、安全/性能覆盖）——每个子任务可独立交付高质量产物，无质量断点。
 
 ### v1.7.9 (2026-07-10)
 
