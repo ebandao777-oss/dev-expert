@@ -201,3 +201,34 @@ A：需要。Spec 驱动开发走 `spec-driven-development` 五步（意图→�
 
 **Q：技术选型（该用哪个框架/库）能直接拍板吗？**
 A：不能。涉及技术选型须走 `tech-selection`：先列候选与决策维度（团队/生态/长期维护/迁移成本），给出可撤销建议并说明假设，而非凭偏好下结论；选型结论须记录到项目记忆的 Decision Record 以便回滚（见 十二、与 `tech-selection`）。
+
+## 十四、JavaScript / Node.js 专项（javascript-development）
+
+**Q：JS/Node.js 项目能用 `@javascript-development` 显式调用吗？**
+A：不能。`javascript-development` 与 Laravel、Java 同属「专项 reference 映射」，只作领域协同资料按需加载，不进 `@` 显式调用索引、不计入 18 子技能（见 七、Q5）。命中 JavaScript/Node.js/ES6/JS 代码检查/JS 风格规范/PHP 内联 JS 等关键词时自动加载。
+
+**Q：JS 项目代码质量怎么验？**
+A：走 `javascript-development`「代码质量检查流程」4 步：① 确认 Node.js 运行时版本（需 >= 15，推荐 18+）→ ② `node --check` 语法检查（利用 Node.js 内置语法解析器，不执行代码）→ ③ 全角符号自动修复（ESLint `--fix` 或按映射手动替换）→ ④ `node -e` 可执行性验证（验证修复后脚本可被 Node.js 正常加载并运行）。验证后再用 `code-review` 加载 JS 代码风格规范 47 条规则做静态审查。Node.js 版本未达 15 必须升级或在 README/CLAUDE.md 标注兼容范围。⚠️ 若 JS 写在 **PHP 文件内联**（混 `<?php ?>` 与 HTML、`onclick="..."` 事件属性、`window.open` 弹窗居中），`php -l` 对 JS 完全无感，必须额外走 `javascript-development`「CMS / PHP 内联 JS 专项」三道强制校验：HTML 事件属性引号配对、window.open features 串非空收尾、批量改造后全仓逐条 Node 校验。
+
+**Q：JS 风格走哪个规范？**
+A：默认走 `javascript-development`「JS 代码风格规范」节，47 条规则 8 分类，按优先级 CRITICAL > HIGH > MEDIUM > LOW：Module/Language/Type Safety/Naming/Control Flow/Functions/Objects/Formatting。核心约束：const 优先（永远不 var）、ES module 优先（不用 require）、class 优先于原型操作、严格相等（==/!= 仅用于 null 检查）、显式分号、不修改内置原型、不用 eval。项目特殊规范存在时以项目为准，但禁止与 CRITICAL 级冲突。
+
+**Q：JS 代码有全角符号/中文标点怎么修复？**
+A：走 `javascript-development`「代码质量检查流程」第 3 步：全角符号修复用 ESLint `--fix` 自动修复，或手动将全角符号替换为半角（`，`→`,`、`。`→`;`、`！`→`!`、`？`→`?`、`：`→`:`、`「`/`」`→`"`、`（`/`）`→`(`/`）`）。常因来源内容含中文标点、复制粘贴编码异常触发。修复后必须重新跑 `node --check` 验证语法，再执行确认逻辑未改坏。
+
+## 十五、Hooks 自动守卫（hooks.json）
+
+**Q：技能自带的 hooks 是什么，怎么启用？**
+A：本技能在 `hooks.json` 中声明了一组**通用示例**守卫钩子，覆盖写前/写后/压缩三类时机，对 18 个子技能与 JS 专项共用。启用方式：把 `hooks.json` 接入你的 Agent 运行时（具体见各 IDE 的 hooks 配置入口），并设置两个环境变量——`PYTHON_BIN`（Python 解释器路径）与 `HOOKS_DIR`（hook 脚本目录，可指向技能自带 `hooks/` 或你项目的 `.codebuddy/hooks/`）。`hooks.json` 内命令串用 `{{PYTHON_BIN}} "{{HOOKS_DIR}}/xxx.py"` 占位符，加载时由运行时替换为真实路径，不写死任何机器路径。
+
+**Q：hooks 守卫具体做哪些检查？**
+A：共 11 个钩子，分三组：
+- **PreToolUse（写前，3 个）**：`backup_on_write`（写/改已存在源码前自动备份为 `.bak`）、`guard_dirs`（拦截对数据/依赖目录的写操作）、`plan_guard`（改核心目录前强制要求存在进行中的 `*_plan.md`）。
+- **PostToolUse（写后，7 个）**：`lint_on_write`（写 PHP 后语法自检）、`php8_compat`（PHP 8.x 兼容扫描）、`security_scan`（安全红线静态扫描，对齐 Rules §5）、`secret_scan`（敏感信息扫描，对齐 §5/§19）、`utf8_check`（UTF-8 合法性校验）、`debug_residue`（调试残留扫描）、`select_star`（裸 `SELECT *` 扫描）。
+- **PreCompact（压缩前，1 个）**：`handoff_snapshot`（压缩/交接前生成检查点快照，保障长任务可恢复）。
+
+**Q：hooks 能替代 Agent 自己的验证吗？**
+A：不能。hooks 是**强制护栏**，只兜底机械项（备份、lint、PHP8 兼容、安全/脱敏、UTF-8、调试残留、SELECT *、压缩快照、规划拦截、受保护目录写前拦截）；动态/业务正确性（如真实运行、端到端验证）仍须 Agent 显式产出证据链。hooks 拦截即视为该防线未过，禁止绕过。若运行时无 hooks 集成，须回退到对应正文手动执行，不得留空白洞。
+
+**Q：脚本路径报"找不到文件"怎么办？**
+A：先确认 `HOOKS_DIR` 指向的目录里确有对应 `.py`（技能自带在 `dev-expert/hooks/`，或你复制到项目的 `.codebuddy/hooks/`）。示例 `hooks.json` 默认指向占位符，未设 `HOOKS_DIR` 或指向错误目录都会找不到脚本——这不是技能 bug，是部署变量未配置。

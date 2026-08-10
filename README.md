@@ -55,6 +55,20 @@ Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUni
 | 要改技能执行规则 | `SKILL.md` | 对应 `references/*.md` |
 | 要看某个技能细节 | `references/` 下对应文件 | `FAQ.md` 的反模式清单 |
 
+## Hooks 自动守卫（可选，增强护栏）
+
+本技能在 `hooks.json` 中提供一组**通用示例**守卫钩子（11 个，覆盖 PreToolUse / PostToolUse / PreCompact），对全部子技能与 JS 专项共用，作为强制护栏兜底机械项（备份、lint、PHP8 兼容、安全/脱敏、UTF-8、调试残留、SELECT *、压缩快照、规划拦截、受保护目录写前拦截）。
+
+**启用步骤**：
+
+1. 将 `hooks.json` 接入你的 Agent 运行时（按各 IDE 的 hooks 配置入口加载）。
+2. 设置两个环境变量：
+   - `PYTHON_BIN`：Python 解释器路径（如 `/usr/bin/python3` 或 `F:\BtSoft\python\python_python\python3.exe`）
+   - `HOOKS_DIR`：hook 脚本目录，可指向技能自带 `dev-expert/hooks/`，或你复制到项目的 `.codebuddy/hooks/`
+3. `hooks.json` 命令串用 `{{PYTHON_BIN}} "{{HOOKS_DIR}}/xxx.py"` 占位符，加载时由运行时替换为真实路径——**不写死任何机器路径**，换机换项目直接改环境变量即可。
+
+> hooks 是护栏不是验证替代：动态/业务正确性（真实运行、端到端）仍须 Agent 显式产出证据。hooks 拦截即视为该防线未过，禁止绕过；运行时无 hooks 集成时须回退正文手动执行。钩子明细与故障排查见 `FAQ.md` 十五、Hooks 自动守卫。
+
 ## 协同技能
 
 ### 子技能内部协同
@@ -82,9 +96,27 @@ Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUni
 
 ## 版本
 
-v1.8.0 | 更新日期: 2026-08-10
+v1.8.4 | 更新日期: 2026-08-10
 
 ## 变更日志
+
+### v1.8.4 (2026-08-10)
+
+- JavaScript 专项参考完整性维护：① 审查修复 FAQ 悬空 `fix_js_code()` 引用、Node 下限统一 ≥15；② 补充「CMS / PHP 内联 JS 专项」三道强制校验（HTML 事件属性引号配对 / window.open features 非空收尾 / 批量改造后全仓 Node 校验）；③ 按二开场景裁剪：移除 9 种设计模式整节、JSDoc 整节、Node 专属生产坑（文件 749→262 行）；④ 补全 FAQ 七节 Q5 专项 reference 引用一致性（含 `javascript-development`）；⑤ 备份文件移出 `references/`
+- SKILL.md 领域路由表（JS 关键词含 PHP 内联 JS/window.open/onclick 事件属性）、优先级矩阵、协同顺序规则同步对齐 JS 链路
+
+### v1.8.3 (2026-08-10)
+
+- 新增「JavaScript 专项开发参考」（`references/javascript-development.md`）：整合 JS 代码质量检查（Node.js 4 步工作流：版本检查→语法检查→修复→验证）、9 种 GoF 设计模式、Google JS Style Guide（47 条规则 8 分类摘要）、JSDoc 文档注释规范、常见生产坑；**含「CMS / PHP 内联 JS 专项」小节**——固化 PHP 混编文件内 `php -l` 漏检 JS 的三道强制校验
+- SKILL.md 领域路由表、专项 reference 映射、优先级矩阵和协同顺序规则同步追加 JS/Node.js 链路
+
+### v1.8.2 (2026-08-10)
+
+- 新增「同类产品适配」专节：覆盖 CodeBuddy CN / Trae CN / Qoder CN / WorkBuddy 四平台适配矩阵、跨平台使用指南和平台无关能力清单；FAQ 新增「十五、同类产品适配」问答
+
+### v1.8.1 (2026-08-10)
+
+- 新增「国内云服务适配」专节：覆盖阿里云/腾讯云/华为云部署、存储、数据库、容器、CDN、Serverless 等场景路由与 IaC 推荐；FAQ 新增「十四、国内云服务适配」问答
 
 ### v1.8.0 (2026-08-10)
 
@@ -278,7 +310,8 @@ v1.8.0 | 更新日期: 2026-08-10
 - `SKILL.md` - 技能运行时指令
 - `README.md` - 本文件，用户入口文档
 - `FAQ.md` - 常见问题、执行禁区、验证失败和边界外请求答疑
-- `references/` - 子技能详细模板（共18个子技能）
+- `references/` - 子技能详细模板（共18个子技能）+ 4 个专项 reference（不计入子技能）
 - `references/laravel-development.md` - Laravel 开发专项参考（不计入子技能）
 - `references/laravel-testing.md` - Laravel 测试专项参考（不计入子技能）
 - `references/java-development.md` - Java/Spring 开发专项参考（不计入子技能）
+- `references/javascript-development.md` - JavaScript/Node.js 开发专项参考（不计入子技能）；含「CMS / PHP 内联 JS 专项」：PHP 内联 JS 强制校验（引号配对 / window.open features 收尾 / 全仓 Node 校验）
