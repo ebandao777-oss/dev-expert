@@ -51,6 +51,7 @@ Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUni
 | 只想知道怎么用 | `README.md` 的“3 分钟上手”和“子技能列表” | `FAQ.md` |
 | 不知道该用哪个技能 | `README.md` 子技能列表 | `SKILL.md` 路由表 |
 | 遇到报错、卡住、看不懂提示 | `FAQ.md` | 对应 `references/*.md` 的失败回退机制 |
+| 长任务执行/续做/可靠交付 | `FAQ.md` 第九节 | `SKILL.md` 长任务执行可靠性专节 |
 | 要改技能执行规则 | `SKILL.md` | 对应 `references/*.md` |
 | 要看某个技能细节 | `references/` 下对应文件 | `FAQ.md` 的反模式清单 |
 
@@ -81,9 +82,22 @@ Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUni
 
 ## 版本
 
-v1.7.10 | 更新日期: 2026-08-07
+v1.8.0 | 更新日期: 2026-08-10
 
 ## 变更日志
+
+### v1.8.0 (2026-08-10)
+
+- 融合 ClawMemory 写后即记协议：每次实质性操作（Bug修复/功能实现/重构/决策定案等）完成后立即追加 `daily.md`（append-only），不等待会话结束
+- 新增 Step 0「工作记忆加载」：新会话启用写后即记上下文，7 类触发条件自动追加当日操作日志
+- 新增记忆维护协议：`daily.md` 超 8000 字符精简提醒，超 12000 字符强制蒸馏；>30 天日志目录自动蒸馏入 `project_memory.md` 后清理
+- 新增记忆生命周期流转：daily.md → session_memory → project_memory → user_profile
+
+### v1.7.11 (2026-08-09)
+
+- 新增「二、子Agent 边界与委派协议」专节（L0 级）：子Agent 分类与定位、核心禁令（禁改码/方案须复核/不继承铁律）、检索收集型输出规范、委派前置条件、边界外禁止、与主流程衔接；FAQ 新增「八、子Agent 边界」问答
+- 新增「长任务执行可靠性（L0）」专节：澄清轮次上限仅约束单 Wave 收敛循环（不跨 Wave 累计、已验证产出物不回退清零）、周期检查点（handoff.md/状态文件）、两层进度验证、可靠交付物四要素强制披露；验收标准新增「长任务可靠」维度，模板化交付新增未验证项强制披露条款
+- 收敛 SKILL.md 过度叙事描述，保留全部规则、表格、参数与交叉引用
 
 ### v1.7.10 (2026-08-07)
 

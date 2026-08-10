@@ -41,6 +41,7 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 | L3 项目级 | `{PROJECT_ROOT}/.ai-memory/project_memory.md`                            | 项目规则、约束、约定、教训   | 项目 |
 | L3 交接级 | `{PROJECT_ROOT}/.ai-memory/handoff.md`                                   | 未完成任务的换机/换 IDE 交接 | 项目 |
 | L2 会话级 | `{PROJECT_ROOT}/.ai-memory/{YYYYMMDD}/session_memory_{session-id}.jsonl` | 单次会话的任务/TODO/相关文件 | 项目 |
+| L1 工作级 | `{PROJECT_ROOT}/.ai-memory/{YYYYMMDD}/daily.md`                          | 当日逐条操作日志（append-only） | 项目 |
 | L1 对话级 | `{PROJECT_ROOT}/.ai-memory/{YYYYMMDD}/topics.md`                         | 当日会话主题摘要             | 项目 |
 
 **路径变量解析**：
@@ -59,6 +60,7 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 │   ├── handoff.md                       # L3 交接级：未完成任务恢复点
 │   ├── 20260705/                        # L2/L1 按日期组织
 │   │   ├── topics.md                    # L1 当日会话主题摘要
+│   │   ├── daily.md                     # L1 当日逐条操作日志（append-only）
 │   │   ├── session_memory_6a4840b8.jsonl # L2 单次会话记录
 │   │   └── session_memory_7b5c3e91.jsonl
 │   └── 20260706/
@@ -74,6 +76,7 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 | `.ai-memory/project_memory.md`          | ✅ 提交      | 项目规则和约定，团队共享，版本追溯     |
 | `.ai-memory/handoff.md`                 | ✅ 提交      | 换电脑/换 IDE 时恢复未完成任务         |
 | `.ai-memory/{YYYYMMDD}/topics.md`       | ❌ 忽略      | 当日会话摘要，含个人上下文，不团队共享 |
+| `.ai-memory/{YYYYMMDD}/daily.md`        | ❌ 忽略      | 当日逐条操作日志，含个人上下文，不团队共享 |
 | `.ai-memory/{YYYYMMDD}/session_*.jsonl` | ❌ 忽略      | 单次会话详情，含个人上下文，不团队共享 |
 | `{USER_PROFILE}/.ai-memory/`            | 不适用       | 用户主目录，不在项目仓库内             |
 
@@ -98,6 +101,18 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 - 写入必须使用 UTF-8 无 BOM 编码，禁止使用 PowerShell 的 `Set-Content` / `Out-File`
 - L1/L2 每日一个目录，L3 每项目一个文件，L4 每用户一个文件
 - Windows 环境下路径分隔符为 `\`，macOS/Linux 为 `/`，写入时按当前系统规范化
+
+### 即时写入规则（写后即记）
+
+`daily.md` 采用 **append-only** 模式，在每次实质性操作完成后**立即追加**，不经用户确认、不等待会话结束。写入触发条件、写入格式和运行位置见主 SKILL.md「Step 0: 工作记忆加载 → 写后即记协议」。
+
+**实现规则**：
+
+1. 每次追加前仅读取 `daily.md` 末尾 20 行确认已有记录（避免全量读取浪费上下文），然后直接 append
+2. 写入使用 UTF-8 无 BOM 编码，Windows 换行符 `\r\n`
+3. 若 `daily.md` 不存在，先创建带 `# 工作日志 - [YYYY-MM-DD]` 标题头的新文件再追加
+4. 同一条记录的多个文件修改合并到一行 `daily.md` 条目，不拆条
+5. `daily.md` 内容超过 8000 字符时，Agent 应在 Step 6 出示精简提醒，建议用户将旧记录蒸馏入 `project_memory.md`
 
 ### 读取规则
 
@@ -393,6 +408,41 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 ### 失败模式处理
 
 出现以下情况时优先收敛记忆范围:记忆膨胀(L2/L3/L4 持续增加低价值细节)→ 执行记忆瘦身;记忆冲突(多个互斥规范)→ 按时间、证据强度、风险等级选择有效规则，旧规则标注过期;透明度不足(记忆影响交付但未说明依据)→ 显式说明来源和适用范围。失败模式与主 SKILL.md「对话流异常处理边界」章节对齐，不在此重复。
+
+### 记忆维护协议
+
+#### 30 天蒸馏周期
+
+每超过 30 天的 `{YYYYMMDD}/` 日志目录，其 `daily.md` 内容必须在下一个维护窗口中蒸馏入 `project_memory.md`：
+
+1. **蒸馏时机**：Step 6 复盘时检查，若存在 >30 天的日志目录且仍未处理，触发蒸馏
+2. **蒸馏规则**：
+   - 提取 `daily.md` 中的关键决策 → 写入 `project_memory.md` 的 Decision Record 章节
+   - 提取新发现的 Bug 模式/陷阱 → 写入 `project_memory.md` 的 Known Issues 章节
+   - 提取项目约定/偏好 → 写入 `project_memory.md` 的 Project Convention 章节
+   - 纯操作流水（如"修改了 X 文件"）不蒸馏，直接丢弃
+3. **清理规则**：蒸馏完成后删除该 `{YYYYMMDD}/` 目录及其内的 `daily.md`、`topics.md` 和所有 `session_*.jsonl`
+4. **防冲突**：若 `daily.md` 中的记录与 `project_memory.md` 现有条目冲突，追加修正条目并标注来源日期，不覆盖原有记录
+
+#### daily.md 精简阈值
+
+| 阈值            | 动作                                                 |
+| --------------- | ---------------------------------------------------- |
+| ≤ 8000 字符     | 正常追加，无需处理                                   |
+| > 8000 字符     | Step 6 出示精简提醒，询问用户是否蒸馏当日旧记录       |
+| > 12000 字符    | 强制精简：取最近 30 条记录保留，其余蒸馏入 `project_memory.md` |
+
+#### 三层记忆生命周期
+
+```
+daily.md（逐条操作日志）
+  ↓ 会话结束
+session_memory_{id}.jsonl（会话总结）+ topics.md（主题摘要）
+  ↓ >30 天
+project_memory.md（长期精选项目记忆）
+  ↓ 跨项目
+user_profile.md（用户级偏好，手动提炼）
+```
 
 ## 输出格式
 
