@@ -32,8 +32,8 @@ allowed-tools:
 
 | 读取目标 | 范围 | 用途 |
 | -------- | ---- | ---- |
-| `{YYYYMMDD}/daily.md` | 今天 + 昨天 | 获取最近操作详情（操作级肌肉记忆） |
-| `project_memory.md` | 全量（按截断规则） | 获取项目约定、已知问题、历史决策（项目级长期知识） |
+| `{YYYYMMDD}/daily.md` | 今天 + 昨天 | 获取最近操作详情 |
+| `project_memory.md` | 全量（按截断规则） | 获取项目约定、已知问题、历史决策 |
 
 读取规则详见 `project-memory-management`「读取截断规则」。两者与 Step 1.1 三层策略（L1 topics / L2 session / L3 references）互补：L1-L3 提供会话级骨架，daily.md 提供操作级细节，project_memory.md 提供项目级积累。
 
@@ -248,10 +248,10 @@ allowed-tools:
 
 | 专项 reference        | 文件                                                                     |
 | --------------------- | ------------------------------------------------------------------------ |
-| `laravel-development` | [references/laravel-development.md](./references/laravel-development.md) |
-| `laravel-testing`     | [references/laravel-testing.md](./references/laravel-testing.md)         |
-| `java-development`    | [references/java-development.md](./references/java-development.md)       |
-| `javascript-development` | [references/javascript-development.md](./references/javascript-development.md) |
+| `laravel-development` | [./references/laravel-development.md] |
+| `laravel-testing`     | [./references/laravel-testing.md]         |
+| `java-development`    | [./references/java-development.md]       |
+| `javascript-development` | [./references/javascript-development.md] |
 
 ## 子技能索引
 
@@ -259,24 +259,24 @@ allowed-tools:
 
 | 子技能           | 英文标识                           | 文件                                                                                               |
 | ---------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------- |
-| 软件项目总控     | `software-project`                 | [references/software-project.md](./references/software-project.md)                                 |
-| 网站项目总控     | `website-project`                  | [references/website-project.md](./references/website-project.md)                                   |
-| API设计          | `api-design`                       | [references/api-design.md](./references/api-design.md)                                             |
-| Bug诊断          | `bug-diagnosis`                    | [references/bug-diagnosis.md](./references/bug-diagnosis.md)                                       |
-| Karpathy编码规范 | `karpathy-coding-guidelines`       | [references/karpathy-coding-guidelines.md](./references/karpathy-coding-guidelines.md)             |
-| Spec驱动开发     | `spec-driven-development`          | [references/spec-driven-development.md](./references/spec-driven-development.md)                   |
-| 代码审查         | `code-review`                      | [references/code-review.md](./references/code-review.md)                                           |
-| 代码生成         | `code-generation`                  | [references/code-generation.md](./references/code-generation.md)                                   |
-| 任务拆解与执行   | `task-decomposition-and-execution` | [references/task-decomposition-and-execution.md](./references/task-decomposition-and-execution.md) |
-| 技术选型         | `tech-selection`                   | [references/tech-selection.md](./references/tech-selection.md)                                     |
-| 文档生成         | `doc-generation`                   | [references/doc-generation.md](./references/doc-generation.md)                                     |
-| 测试用例生成     | `test-generation`                  | [references/test-generation.md](./references/test-generation.md)                                   |
-| 性能基准测试     | `performance-benchmark`            | [references/performance-benchmark.md](./references/performance-benchmark.md)                       |
-| 重构建议         | `refactoring`                      | [references/refactoring.md](./references/refactoring.md)                                           |
-| 项目记忆管理     | `project-memory-management`        | [references/project-memory-management.md](./references/project-memory-management.md)               |
-| CMS二次开发      | `cms-development`                  | [references/cms-development.md](./references/cms-development.md)                                   |
-| 前端设计         | `frontend-design`                  | [references/frontend-design.md](./references/frontend-design.md)                                   |
-| MySQL数据库      | `mysql-database`                   | [references/mysql-database.md](./references/mysql-database.md)                                     |
+| 软件项目总控     | `software-project`                 | [./references/software-project.md]               |
+| 网站项目总控     | `website-project`                  | [./references/website-project.md]                |
+| API设计          | `api-design`                       | [./references/api-design.md]                    |
+| Bug诊断          | `bug-diagnosis`                    | [./references/bug-diagnosis.md]                 |
+| Karpathy编码规范 | `karpathy-coding-guidelines`       | [./references/karpathy-coding-guidelines.md]     |
+| Spec驱动开发     | `spec-driven-development`          | [./references/spec-driven-development.md]        |
+| 代码审查         | `code-review`                      | [./references/code-review.md]                     |
+| 代码生成         | `code-generation`                  | [./references/code-generation.md]                 |
+| 任务拆解与执行   | `task-decomposition-and-execution` | [./references/task-decomposition-and-execution.md] |
+| 技术选型         | `tech-selection`                   | [./references/tech-selection.md]                  |
+| 文档生成         | `doc-generation`                   | [./references/doc-generation.md]                  |
+| 测试用例生成     | `test-generation`                  | [./references/test-generation.md]                  |
+| 性能基准测试     | `performance-benchmark`            | [./references/performance-benchmark.md]            |
+| 重构建议         | `refactoring`                      | [./references/refactoring.md]                     |
+| 项目记忆管理     | `project-memory-management`        | [./references/project-memory-management.md]        |
+| CMS二次开发      | `cms-development`                  | [./references/cms-development.md]                 |
+| 前端设计         | `frontend-design`                  | [./references/frontend-design.md]                  |
+| MySQL数据库      | `mysql-database`                   | [./references/mysql-database.md]                  |
 
 ## 子技能优先级矩阵
 
@@ -371,9 +371,9 @@ allowed-tools:
 
 | 参数             | 默认值 |
 | ---------------- | ------ |
-| 默认循环轮次     | 3      |
-| 安全最大轮次     | 6      |
-| 每轮最大改动点数 | 3      |
+| 默认循环轮次     | 3        |
+| 安全最大轮次     | 6        |
+| 每轮最大改动点数 | 3         |
 | 失败熔断         | 同一Bug 2轮未修复→标记已知限制 |
 | 低收益检测       | 连续2轮仅P2微调→建议提前结束   |
 
