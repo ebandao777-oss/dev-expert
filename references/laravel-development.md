@@ -37,15 +37,15 @@
 
 ## 常见生产坑
 
-| 场景                                     | 风险                                        | 处理方式                                                        |
+| 场景 | 风险 | 处理方式 |
 | ---------------------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
-| `Model::where()->update()`               | 跳过 Eloquent observer、audit、model events | 需要事件时用 `lockForUpdate() + save()`；确实批量绕过时写明原因 |
-| `attach/detach/sync/updateExistingPivot` | 直接写 pivot 表，不触发 pivot model events  | 需要审计时把 pivot 建成真实模型并通过模型写入                   |
-| Observer 删除文件                        | 父级路径清理可能误删兄弟记录文件            | 删除动作限定到当前记录路径，复杂清理交给 Action                 |
-| `chunkById + json_decode + update`       | JSON 字段并发写入被旧快照覆盖               | 浅层修改用 DB 原子表达式；复杂修改需锁或维护窗口                |
-| `DB::afterCommit()`                      | 只避免回滚时执行，不负责提交后失败重试      | 外部副作用默认改成 queued job + retry + failed 处理             |
-| JsonResource 直接返回 Carbon             | 可能绕过 model cast 的日期格式              | API 日期格式在 Resource 内显式 format 并测试                    |
-| 嵌套数组只写 `items.*.field`             | 标量元素可能通过局部规则导致运行时报错      | 同时加 `items.* => array`                                       |
+| `Model::where()->update()` | 跳过 Eloquent observer、audit、model events | 需要事件时用 `lockForUpdate() + save()`；确实批量绕过时写明原因 |
+| `attach/detach/sync/updateExistingPivot` | 直接写 pivot 表，不触发 pivot model events | 需要审计时把 pivot 建成真实模型并通过模型写入 |
+| Observer 删除文件 | 父级路径清理可能误删兄弟记录文件 | 删除动作限定到当前记录路径，复杂清理交给 Action |
+| `chunkById + json_decode + update` | JSON 字段并发写入被旧快照覆盖 | 浅层修改用 DB 原子表达式；复杂修改需锁或维护窗口 |
+| `DB::afterCommit()` | 只避免回滚时执行，不负责提交后失败重试 | 外部副作用默认改成 queued job + retry + failed 处理 |
+| JsonResource 直接返回 Carbon | 可能绕过 model cast 的日期格式 | API 日期格式在 Resource 内显式 format 并测试 |
+| 嵌套数组只写 `items.*.field` | 标量元素可能通过局部规则导致运行时报错 | 同时加 `items.* => array` |
 
 ## Migration 与数据变更
 

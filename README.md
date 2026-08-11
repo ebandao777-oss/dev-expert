@@ -35,37 +35,67 @@ Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUni
 
 如果是第一次使用，不需要记住全部触发词，按下面入口说需求即可：
 
-| 你想做什么 | 推荐说法 | 会进入 |
-| ---------- | -------- | ------ |
-| 写一个功能 | “帮我实现登录接口，要求有参数校验和测试” | 代码生成 + 测试用例生成 |
-| 修一个报错 | “这个报错帮我定位原因并给修复方案” | Bug诊断 |
-| 检查代码有没有问题 | “审查这个文件，重点看安全和性能” | 代码审查 |
-| 做 CMS/PHP 二开 | “这是 WordPress/帝国CMS 项目，帮我加一个后台功能” | CMS二次开发 |
-| 设计接口 | “设计一个订单导出接口，数据量大，需要进度条” | API设计 + Init-Step-Poll |
-| 换电脑继续上次任务 | “继续上次任务，先恢复 handoff” | 项目记忆管理 |
+| 你想做什么         | 推荐说法                                          | 会进入                   |
+| ------------------ | ------------------------------------------------- | ------------------------ |
+| 写一个功能         | “帮我实现登录接口，要求有参数校验和测试”          | 代码生成 + 测试用例生成  |
+| 修一个报错         | “这个报错帮我定位原因并给修复方案”                | Bug诊断                  |
+| 检查代码有没有问题 | “审查这个文件，重点看安全和性能”                  | 代码审查                 |
+| 做 CMS/PHP 二开    | “这是 WordPress/帝国CMS 项目，帮我加一个后台功能” | CMS二次开发              |
+| 设计接口           | “设计一个订单导出接口，数据量大，需要进度条”      | API设计 + Init-Step-Poll |
+| 换电脑继续上次任务 | “继续上次任务，先恢复 handoff”                    | 项目记忆管理             |
+| 顺带做两件事       | “实现导出接口，顺带生成接口文档”                  | 代码生成 + 文档生成      |
+| 不知道功能叫啥     | “帮我看看这段代码安不安全”                        | 代码审查（描述目标即可，不必记名字） |
 
 ### 文档阅读顺序
 
-| 场景 | 先看 | 再看 |
-| ---- | ---- | ---- |
-| 只想知道怎么用 | `README.md` 的“3 分钟上手”和“子技能列表” | `FAQ.md` |
-| 不知道该用哪个技能 | `README.md` 子技能列表 | `SKILL.md` 路由表 |
-| 遇到报错、卡住、看不懂提示 | `FAQ.md` | 对应 `references/*.md` 的失败回退机制 |
-| 长任务执行/续做/可靠交付 | `FAQ.md` 第九节 | `SKILL.md` 长任务执行可靠性专节 |
-| 要改技能执行规则 | `SKILL.md` | 对应 `references/*.md` |
-| 要看某个技能细节 | `references/` 下对应文件 | `FAQ.md` 的反模式清单 |
+| 场景                       | 先看                                     | 再看                                  |
+| -------------------------- | ---------------------------------------- | ------------------------------------- |
+| 只想知道怎么用             | `README.md` 的“3 分钟上手”和“子技能列表” | `FAQ.md`                              |
+| 不知道该用哪个技能         | `README.md` 子技能列表                   | `SKILL.md` 路由表                     |
+| 遇到报错、卡住、看不懂提示 | `FAQ.md`                                 | 对应 `references/*.md` 的失败回退机制 |
+| 长任务执行/续做/可靠交付   | `FAQ.md` 第九节                          | `SKILL.md` 长任务执行可靠性专节       |
+| 要改技能执行规则           | `SKILL.md`                               | 对应 `references/*.md`                |
+| 要看某个技能细节           | `references/` 下对应文件                 | `FAQ.md` 的反模式清单                 |
+
+### 组合子技能与进阶触发
+
+- **不知道某个功能叫什么名字？** 不必背子技能名。路由表同时匹配「子技能名」和「功能说明里的场景词」，直接描述目标/动作即可：说“帮我看看这段代码有没有问题”会命中代码审查，说“这段逻辑太绕了理一理结构”会命中重构建议，说“写个带参数校验的接口”会命中代码生成。实在不确定就描述需求，系统按关键词 + 意图三分法路由，命中不了会向你确认，不会乱猜。
+- **想一次用两个功能？** 用「顺带式」最稳：“做 A，并 / 顺带 / 再帮我做 B”（如“实现导出功能，顺带生成接口文档”→ 代码生成 + 文档生成）；也可「显式点名式」直接用多个 `@` 标识（如“`@code-review` 先审，`@refactoring` 再按问题重构”）。显式调用只跳过路由匹配、不影响协同加载。
+- **组合的典型顺序**：审查类（代码审查 / Bug诊断）是只读的，先出报告、你确认后，再走重构 / 代码生成落地修改；性能类先跑基准拿基线、再重构，禁止无基线声称“显著提升”。多子技能同时命中按优先级矩阵组合路由（首选 + 必要协同），单次最多加载 3 个 reference，过多会提示你分阶段做。
 
 ## Hooks 自动守卫（可选，增强护栏）
 
-本技能在 `hooks.json` 中提供一组**通用示例**守卫钩子（11 个，覆盖 PreToolUse / PostToolUse / PreCompact），对全部子技能与 JS 专项共用，作为强制护栏兜底机械项（备份、lint、PHP8 兼容、安全/脱敏、UTF-8、调试残留、SELECT *、压缩快照、规划拦截、受保护目录写前拦截）。
+本技能在 `hooks.json` 中提供一组**通用示例**守卫钩子（11 个，覆盖 PreToolUse / PostToolUse / PreCompact），对全部子技能与 JS 专项共用，作为强制护栏兜底机械项（备份、lint、PHP8 兼容、安全/脱敏、UTF-8、调试残留、SELECT \*、压缩快照、规划拦截、受保护目录写前拦截）。
 
-**启用步骤**：
+**启用步骤**（两种方式任选其一）：
+
+**方式 A：运行时占位符替换**（适用于支持变量替换的 IDE）
 
 1. 将 `hooks.json` 接入你的 Agent 运行时（按各 IDE 的 hooks 配置入口加载）。
 2. 设置两个环境变量：
    - `PYTHON_BIN`：Python 解释器路径（如 `/usr/bin/python3` 或 `F:\BtSoft\python\python_python\python3.exe`）
    - `HOOKS_DIR`：hook 脚本目录，可指向技能自带 `dev-expert/hooks/`，或你复制到项目的 `.codebuddy/hooks/`
 3. `hooks.json` 命令串用 `{{PYTHON_BIN}} "{{HOOKS_DIR}}/xxx.py"` 占位符，加载时由运行时替换为真实路径——**不写死任何机器路径**，换机换项目直接改环境变量即可。
+
+**方式 B：安装器预处理**（适用于运行时不支持占位符替换的 IDE，推荐跨平台使用）
+
+1. 运行安装器，自动探测 Python 路径和 hooks 目录，生成已替换占位符的 `hooks.installed.json`：
+
+   ```bash
+   # 自动探测（推荐）
+   python hooks/install_hooks.py
+
+   # 或通过参数指定
+   python hooks/install_hooks.py --python-bin /usr/bin/python3 --hooks-dir /path/to/hooks
+
+   # 或通过环境变量指定
+   PYTHON_BIN=/usr/bin/python3 HOOKS_DIR=/path/to/hooks python hooks/install_hooks.py
+   ```
+
+2. 将生成的 `hooks.installed.json` 接入你的 Agent 运行时（路径已硬编码，无需运行时替换）。
+3. 换机换项目时重跑安装器即可；`--in-place` 可原地覆盖（自动备份为 `.bak`），但建议保留 `hooks.json` 模板不变，仅使用 `hooks.installed.json`。
+
+> `hooks.installed.json` 文件顶部的 `_comment` 内含**各智能体平台适配说明**：CodeBuddy CN（工具名 `write_to_file`/`replace_in_file`）、Trae/Cursor 类（工具名 `Write`/`Edit`）等，matcher 已同时覆盖；若平台工具名不同（如 `MultiEdit`），在 matcher 里用 `|` 追加即可，无需改脚本。换机/换平台后 command 中的 Python 与 hooks 目录路径需同步更新（用安装器重生成或直接改 command）。
 
 > hooks 是护栏不是验证替代：动态/业务正确性（真实运行、端到端）仍须 Agent 显式产出证据。hooks 拦截即视为该防线未过，禁止绕过；运行时无 hooks 集成时须回退正文手动执行。钩子明细与故障排查见 `FAQ.md` 十五、Hooks 自动守卫。
 
@@ -96,9 +126,23 @@ Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUni
 
 ## 版本
 
-v1.10.0 | 更新日期: 2026-08-11
+v1.11.1 | 更新日期: 2026-08-12
 
 ## 变更日志
+
+### v1.11.1 (2026-08-12)
+
+- README「3 分钟上手」新增两行（顺带做两件事 / 不知道功能叫啥），并新增「组合子技能与进阶触发」小节：说明不知道功能名时直接描述目标、一次用两个功能的「顺带式 / 显式点名式」表达、组合的典型顺序与 3-reference 上限
+- FAQ 新增第十八节「子技能组合与触发进阶」：澄清代码审查 + 重构等组合能否同时用、怎么配合（先审查后重构 / 审计修复分离）、常见组合套餐、不知功能名与双功能组合的触发表达
+
+### v1.11.0 (2026-08-11)
+
+- allowed-tools 补充 Task（子 Agent）工具：与 SKILL.md L438 子 Agent 边界声明对齐，长任务可委派子 Agent 并行处理
+- allowed-tools 补充 WebSearch 工具：编程场景支持查最新文档、API 参考、解决方案
+- 新增 `hooks/dep_scan.py`：依赖文件变更后提示漏洞扫描命令（npm audit / pip-audit / composer audit / govulncheck / mvn dependency-check / bundle audit），覆盖 16 种依赖清单文件
+- 新增 `hooks/sql_injection_check.py`：SQL 注入风险检查，覆盖 7 种风险模式（PHP $_GET/$_POST 直接入 SQL、PHP 字符串拼接、PHP 变量插值、Python f-string、Python % 格式化、JS 模板字符串、Java 字符串拼接），支持 9 种安全模式识别（prepare/bindParam/bindValue/ORM 等），13 项测试全通过
+- hooks.json 注册 dep_scan 和 sql_injection_check 为 PostToolUse hook
+- 全技能表格对齐空格压缩优化：SKILL.md + 13 个 reference 文件，合计节省约 6,900 token，零语义损失
 
 ### v1.10.0 (2026-08-11)
 
@@ -158,7 +202,7 @@ v1.10.0 | 更新日期: 2026-08-11
 
 ### v1.7.10 (2026-08-07)
 
-- 全包完整性审计：18 个子技能 reference + 3 个专项 reference（laravel-development / laravel-testing / java-development）全部齐备；SKILL.md / README.md / FAQ.md 中全部 `references/*.md` 链接零断链；主流程 6 步跨文件引用的 7 处步骤号（software-project 第六步、code-generation 第六步、bug-diagnosis 第七步、website-project 第七步、frontend-design 第九步、cms-development 第八步、project-memory-management 第五步）全部命中目标文件；18 个子技能均含「失败回退机制」表——任务可端到端执行交付，无断点。
+- 全包完整性审计：18 个子技能 reference + 3 个专项 reference（laravel-development / laravel-testing / java-development）全部齐备；SKILL.md / README.md / FAQ.md 中全部 `references/*.md` 链接零断链；主流程 6 步跨文件引用的 7 处步骤号（software-project 第六步、code-generation 第六步、bug-diagnosis 第七步、website-project 第七步、frontend-design 第十步、cms-development 第八步、project-memory-management 第五步）全部命中目标文件；18 个子技能均含「失败回退机制」表——任务可端到端执行交付，无断点。
 - 子任务质量审计：18 个子技能均具备「输入要求 / 输出格式 / 质量标准 / 失败回退机制」四大质量支柱；质量标准为可核查硬约束（api-design 7 项规范验证清单、test-generation 强制安全/性能/长任务覆盖、bug-diagnosis 根因须有验证证据且禁止猜测）；跨子技能质量协同一致（Spec 前置闸门、Karpathy 精准修改、Init-Step-Poll 长任务契约、安全/性能覆盖）——每个子任务可独立交付高质量产物，无质量断点。
 
 ### v1.7.9 (2026-07-10)
@@ -343,3 +387,27 @@ v1.10.0 | 更新日期: 2026-08-11
 - `references/delivery-assurance.md` - 交付保障：执行率自检 / 收尾报告 / 确认超时 / Graceful Abort
 - `references/error-ledger.md` - 踩坑错误册：ERR-XXX 索引 + 单条模板 + 触发-定位-读取 + 新坑即录 + 归档
 - `references/execution-safety.md` - 执行安全：规划门禁 / 审计修复分离 / 批量修改防线 / 写码前确认 / 不卡死计数器 / 清单化质量+安全
+
+## 维护建议
+
+### Reference 体量监控
+
+单个 reference 文件建议控制在 **400 行以内**；超过时考虑拆分（如「设计规范」与「实现规范」分离）或提取共性内容到独立 reference。当前体量分布（按行数降序）：
+
+| 文件                         | 行数   | 评估                                       |
+| ---------------------------- | ------ | ------------------------------------------ |
+| project-memory-management.md | ~479   | 偏大，职责内聚可暂保留                     |
+| frontend-design.md           | ~435   | 偏大，后续可拆分「设计规范」与「实现规范」 |
+| cms-development.md           | ~406   | 偏大，CMS 场景复杂度本身高                 |
+| code-review.md               | ~309   | 合理                                       |
+| 其余 21 个                   | 84-281 | 健康                                       |
+
+### 跨文件步骤号一致性检查
+
+新增/修改 reference 章节号后，运行检查器验证 SKILL.md / README.md / FAQ.md 中的步骤号引用与目标文件实际章节一致：
+
+```bash
+python hooks/step_ref_check.py
+```
+
+退出码 0 = 全部匹配；1 = 发现不匹配（会列出具体位置和期望/实际步骤号）。建议在合并 PR 前或重大版本发布前运行。

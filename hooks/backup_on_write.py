@@ -7,6 +7,8 @@
 - 非阻塞：任何情况下都 exit 0，绝不影响原工具执行。
 - 仅对「已存在」的源码类文件生效；新文件、二进制、敏感目录一律跳过。
 - 若 .bak 已存在且与当前文件内容一致，则跳过，避免无意义覆盖/抖动。
+- 多版本备份：保留最近 MAX_VERSIONS 个历史版本（.bak / .bak.1 / .bak.2），
+  每次备份前轮转旧版本，超出上限的自动删除。
 - 备份失败也静默放行（exit 0），不让备份逻辑阻断用户工作。
 """
 import sys
@@ -14,6 +16,9 @@ import os
 import json
 import shutil
 import filecmp
+
+# 保留最近 N 个历史版本（.bak / .bak.1 / .bak.2）
+MAX_VERSIONS = 3
 
 # 仅备份源码/配置类文件，避免 .bak 污染图片等二进制
 BACKUP_EXT = {
@@ -66,8 +71,25 @@ def main():
 
     bak = path + ".bak"
     try:
+        # 内容一致则跳过（无需备份也无需轮转）
         if os.path.exists(bak) and filecmp.cmp(bak, path, shallow=False):
-            return 0  # 已存在且内容一致，跳过
+            return 0
+
+        # 轮转旧备份：.bak.(N-1) → .bak.N，删除超出 MAX_VERSIONS 的
+        # 从最旧开始处理，避免覆盖
+        oldest = "%s.bak.%d" % (path, MAX_VERSIONS - 1)
+        if os.path.exists(oldest):
+            os.remove(oldest)
+        for i in range(MAX_VERSIONS - 2, 0, -1):
+            src = "%s.bak.%d" % (path, i)
+            dst = "%s.bak.%d" % (path, i + 1)
+            if os.path.exists(src):
+                os.rename(src, dst)
+        # .bak → .bak.1
+        if os.path.exists(bak):
+            os.rename(bak, "%s.bak.1" % path)
+
+        # 备份当前文件
         shutil.copy2(path, bak)
     except Exception:
         return 0

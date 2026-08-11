@@ -76,13 +76,13 @@
 
 按语言和场景选择：
 
-| 语言    | 工具                                       | 适用场景             |
+| 语言 | 工具 | 适用场景 |
 | ------- | ------------------------------------------ | -------------------- |
-| Python  | `cProfile` / `timeit` / `pytest-benchmark` | 函数级耗时、逐行热点 |
+| Python | `cProfile` / `timeit` / `pytest-benchmark` | 函数级耗时、逐行热点 |
 | Node.js | `console.time` / `benchmark.js` / `clinic` | 火焰图、事件循环延迟 |
-| Go      | `go test -bench` / `pprof`                 | CPU/内存 profile     |
-| Java    | JMH                                        | 微基准测试           |
-| PHP     | `microtime()` / Xdebug profiler            | 函数耗时             |
+| Go | `go test -bench` / `pprof` | CPU/内存 profile |
+| Java | JMH | 微基准测试 |
+| PHP | `microtime()` / Xdebug profiler | 函数耗时 |
 
 **首选策略**：若项目已有测试框架，优先用其内置 benchmark（如 pytest-benchmark、go test -bench），降低接入成本。
 
@@ -104,11 +104,11 @@
 
 ### 第六步：优化前后对比（如有基线）
 
-| 指标     | 优化前 | 优化后 | 提升 |
+| 指标 | 优化前 | 优化后 | 提升 |
 | -------- | ------ | ------ | ---- |
-| 耗时     | X ms   | Y ms   | Z%   |
-| 内存     | X MB   | Y MB   | Z%   |
-| 调用次数 | X      | Y      | Z%   |
+| 耗时 | X ms | Y ms | Z% |
+| 内存 | X MB | Y MB | Z% |
+| 调用次数 | X | Y | Z% |
 
 ### 第七步：记录到项目记忆
 

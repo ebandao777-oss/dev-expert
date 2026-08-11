@@ -2,23 +2,49 @@
 # -*- coding: utf-8 -*-
 """PreToolUse hook (GLOBAL): 改核心目录前强制要求存在进行中 *_plan.md（对齐 Rules §13）。
 
-- 仅对落在「核心/危险目录」的 .php 写操作拦截；tests/、Plan/、依赖/资源目录不拦。
+- 对落在「核心/危险目录」的源码文件写操作拦截；tests/、Plan/、依赖/资源目录不拦。
 - 拦截条件：目标在核心目录 且 其 workspace 的 Plan/ 下无任何状态为 规划中/进行中 的 *_plan.md。
 - 命中 exit 2 阻断，提示先建计划（Trivial Fix 通道见 Rules §14，但核心目录改动仍强制规划）。
+
+可配置（环境变量，分号分隔，未设置时用默认值）：
+- PLAN_GUARD_CORE_DIRS：核心目录名集合，默认 src;app;lib;core;internal;system;engine
+- PLAN_GUARD_EXCLUDE_DIRS：排除目录名集合，默认 tests;Plan;backup;vendor;node_modules;uploads;.codebuddy;dist;build;public;static;assets;test;__pycache__;.git
+- PLAN_GUARD_TARGET_EXTS：拦截的文件扩展名，默认 .php;.js;.ts;.jsx;.tsx;.py;.java;.go;.vue
+
+CMS 项目（如帝国CMS）需设置：
+- PLAN_GUARD_CORE_DIRS=e/class;e/data;e/config;e/mods;e/member;e/template;e/admin
 """
 import sys
 import os
 import json
 import re
 
-CORE_DIRS = {
-    "e/class", "e/ebandao7890", "e/data", "e/config",
-    "e/mods", "e/member", "e/template", "e/admin",
-}
-EXCLUDE_DIRS = {
-    "tests", "Plan", "backup", "vendor", "node_modules",
-    "uploads", ".codebuddy", "skin", "images", "d", "api", "search", "ecachefiles",
-}
+def _split_env(name, default):
+    """从环境变量读取分号分隔的集合，未设置时用默认值。"""
+    val = os.environ.get(name, "")
+    if not val.strip():
+        return default
+    return set(p.strip() for p in val.split(";") if p.strip())
+
+# 核心目录：可通过 PLAN_GUARD_CORE_DIRS 配置；默认为通用源码根目录
+CORE_DIRS = _split_env(
+    "PLAN_GUARD_CORE_DIRS",
+    {"src", "app", "lib", "core", "internal", "system", "engine"},
+)
+# 排除目录：可通过 PLAN_GUARD_EXCLUDE_DIRS 配置；默认为通用排除集合
+EXCLUDE_DIRS = _split_env(
+    "PLAN_GUARD_EXCLUDE_DIRS",
+    {
+        "tests", "test", "Plan", "backup", "vendor", "node_modules",
+        "uploads", ".codebuddy", "dist", "build", "public",
+        "static", "assets", "__pycache__", ".git",
+    },
+)
+# 拦截的扩展名：可通过 PLAN_GUARD_TARGET_EXTS 配置
+TARGET_EXTS = _split_env(
+    "PLAN_GUARD_TARGET_EXTS",
+    {".php", ".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".go", ".vue"},
+)
 
 # 「## 状态」标题行（§13 模板为独占一行，状态值在同行或下一行）
 HEAD_RE = re.compile(r'^##\s*状态\s*[:：]?$')
@@ -83,7 +109,8 @@ def main():
     if not path:
         return 0
     path = os.path.abspath(path)
-    if os.path.splitext(path)[1].lower() != ".php":
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in TARGET_EXTS:
         return 0
 
     norm = path.replace("\\", "/").lower()
