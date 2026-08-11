@@ -96,9 +96,24 @@ Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUni
 
 ## 版本
 
-v1.9.0 | 更新日期: 2026-08-11
+v1.10.0 | 更新日期: 2026-08-11
 
 ## 变更日志
+
+### v1.10.0 (2026-08-11)
+
+- 补齐 CodeBuddy Rules 覆盖时缺失的 14 项规则机制，对标对表逐项落地：
+  - 新增 `delivery-assurance.md`：执行率自检（SELF-AUDIT 11 条）、收尾报告模板（5 字段强制格式）、确认超时默认规则、Graceful Abort 流程
+  - 新增 `error-ledger.md`：踩坑错误册 ERR-XXX 系统（索引 + 单条模板 + 触发-定位-读取流程 + 新坑即录 + 归档策略）
+  - 新增 `execution-safety.md`：规划门禁（PLAN-GATE 15 项）、写码前实码确认（读文件+搜关联+冲突检查）、审计修复分离（两阶段不交叉）、不卡死计数器（≥3 次列替代方案）、批量修改 7 防线（预检→试点→备份→执行→后检→MD5→回读）、清单化质量自审 10 条、安全红线清单 10 条
+- SKILL.md 六步闭环各 Step 同步接入新 reference：
+  - Step 2：规划门禁（PLAN-GATE）强制打勾，Trivial Fix 可跳过
+  - Step 3：写码前实码确认 / 审计修复分离 / 不卡死计数器 / 批量修改 7 防线 / 清单化质量自审+安全红线
+  - Step 4：清单化验证（质量 10 条 + 安全红线 10 条）+ PHP 内联 JS 三道强制校验
+  - Step 5：执行率自检 + 收尾报告模板 + 确认超时默认 + Graceful Abort
+  - Step 6：踩坑错误册更新（新坑即录 + Bug 诊断/审查/重构 session 启动时查索引匹配）
+- FAQ 新增第十七节「交付保障与踩坑管理」6 条 Q&A
+- README 文件结构同步 3 个新 reference
 
 ### v1.9.0 (2026-08-11)
 
@@ -320,8 +335,11 @@ v1.9.0 | 更新日期: 2026-08-11
 - `SKILL.md` - 技能运行时指令
 - `README.md` - 本文件，用户入口文档
 - `FAQ.md` - 常见问题、执行禁区、验证失败和边界外请求答疑
-- `references/` - 子技能详细模板（共18个子技能）+ 4 个专项 reference（不计入子技能）
+- `references/` - 子技能详细模板（共18个子技能）+ 4 个专项 reference（不计入子技能）+ 3 个工作流保障 reference
 - `references/laravel-development.md` - Laravel 开发专项参考（不计入子技能）
 - `references/laravel-testing.md` - Laravel 测试专项参考（不计入子技能）
 - `references/java-development.md` - Java/Spring 开发专项参考（不计入子技能）
 - `references/javascript-development.md` - JavaScript/Node.js 开发专项参考（不计入子技能）；含「CMS / PHP 内联 JS 专项」：PHP 内联 JS 强制校验（引号配对 / window.open features 收尾 / 全仓 Node 校验）
+- `references/delivery-assurance.md` - 交付保障：执行率自检 / 收尾报告 / 确认超时 / Graceful Abort
+- `references/error-ledger.md` - 踩坑错误册：ERR-XXX 索引 + 单条模板 + 触发-定位-读取 + 新坑即录 + 归档
+- `references/execution-safety.md` - 执行安全：规划门禁 / 审计修复分离 / 批量修改防线 / 写码前确认 / 不卡死计数器 / 清单化质量+安全

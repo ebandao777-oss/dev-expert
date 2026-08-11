@@ -255,3 +255,23 @@ A：当同一概念被多个名称指代时，project-memory-management 会自�
 
 **Q：快速原型需要画图吗？**
 A：不需要高保真设计图。frontend-design 的二步点五用 ASCII 线框图快速对齐页面骨架和交互流。用户确认结构后再进入完整视觉设计，避免方向性返工。
+
+## 十七、交付保障与踩坑管理
+
+**Q：SELF-AUDIT 执行率自检是什么？什么时候触发？**
+A：交付前强制执行（收口于 Step 5），11 条硬约束（E2E 条目/验收标准/安全/质量/性能/轮次/构建/修改 checkpoints/回退/规划/附加项）。任一 ❌ 回退对应阶段修复→重走 Step 4→复检，最多 3 轮；超出后列未修复项+原因+选项，不阻塞交付。详见 `delivery-assurance.md`「执行率自检」。
+
+**Q：收尾报告长什么样？**
+A：固定 5 字段格式：`完成度: X% | 主线: {状态} | 产出: {摘要} | 待办: {内容/无} | 下一步: {建议/无}`。禁止自由格式，必须有验证可追溯。详见 `delivery-assurance.md`「收尾报告模板」。
+
+**Q：任务中途我想中止怎么办？**
+A：走 Graceful Abort 流程：输出中止声明→保留 .bak 备份→plan.md 标注中断点→清理临时脚本（不删 .bak）→简化收尾。恢复时从 handoff.md 或 plan.md 中断点继续，回滚则倒序 .bak 恢复。详见 `delivery-assurance.md`「Graceful Abort」。
+
+**Q：确认超时了会怎么处理？**
+A：通用确认 5 分钟无回复→最保守/安全选项自动推进；破坏性操作（DDL/删除/覆盖/批量写）→默认取消；规划确认→默认推进；安全相关→一律等明确回复。详见 `delivery-assurance.md`「确认超时默认规则」。
+
+**Q：踩坑错误册（ERR-XXX）怎么用？**
+A：索引表 `error_index.md` + 单条 `errors/ERR-XXX.md`。Bug 诊断/审查/重构 session 启动时先用正则/关键词匹配索引的触发关键词，命中则读对应 ERR-ID 全文复用修复方式。新坑排查耗时 ≥ 40 分钟→强制分配 ERR-ID+写单条+更新索引+同步 project_memory Known Issues。详见 `error-ledger.md`。
+
+**Q：批量修改很多文件时有什么安全保障？**
+A：触发"批量修改 7 防线"（≥ 3 文件或 ≥ 10 处修改点）：预检 lint→试点 3-5 文件→备份 .bak→逐文件执行+日志→后检 lint→MD5 对比→回读确认。ROLLBACK > 20% 整批回退。详见 `execution-safety.md`「批量修改 7 防线」。
