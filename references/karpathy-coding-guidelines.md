@@ -1,4 +1,4 @@
-# Karpathy编码规范 -- Karpathy编码哲学
+# Karpathy编码规范
 
 基于Andrej Karpathy对LLM编码陷阱的观察，提供4条核心编码原则。
 

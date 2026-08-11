@@ -1,4 +1,4 @@
-# Java 专项开发参考
+# Java 专项开发
 
 > 本文件是 `dev-expert` 的 Java/Spring 专项补充参考，不作为独立子技能计数，也不提供 `@` 显式调用入口。命中 Java、Spring Boot、Spring、MyBatis、Hibernate、JPA、Maven、Gradle、JUnit、Mockito、JVM、GC、线程池、并发、Java 源码分析等信号时，按需与 `code-generation`、`code-review`、`test-generation`、`performance-benchmark`、`software-project` 协同加载。
 

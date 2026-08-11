@@ -1,4 +1,4 @@
-# CMS二次开发 -- PHP+MySQL CMS 二次开发
+# CMS二次开发
 
 面向基于 PHP+MySQL 的 CMS 二次开发场景，提供从环境探测、兼容性修复、插件开发到安全加固的全链路指引。覆盖 EmpireCMS、WordPress、ThinkPHP、Laravel 等主流 CMS/框架。
 

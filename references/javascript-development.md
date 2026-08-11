@@ -1,4 +1,4 @@
-# JavaScript 专项开发参考
+# JavaScript
 
 > 本文件是 `dev-expert` 的 JS/Node.js 框架专项补充参考，不作为独立子技能计数，也不提供 `@` 显式调用入口。命中 JavaScript、Node.js、ES6+、代码风格、代码检查、PHP 内联 JS 等信号时，按需与 `code-generation`、`api-design`、`bug-diagnosis`、`code-review`、`software-project` 协同加载。
 

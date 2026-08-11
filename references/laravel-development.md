@@ -1,4 +1,4 @@
-# Laravel 专项开发参考
+# Laravel 专项开发
 
 > 本文件是 `dev-expert` 的 Laravel/PHP 框架专项补充参考，不作为独立子技能计数，也不提供 `@` 显式调用入口。命中 Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUnit、PHPStan 等信号时，按需与 `code-generation`、`cms-development`、`mysql-database`、`api-design`、`software-project` 协同加载。
 

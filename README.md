@@ -27,7 +27,7 @@
 
 ## 使用方法
 
-通过 Marvis 对话自然触发，说出需求即可自动匹配对应子技能。
+通过 对话自然触发，说出需求即可自动匹配对应子技能。
 
 Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUnit、PHPStan 等关键词会触发 Laravel 专项参考；Java、Spring Boot、MyBatis、JPA、Maven、Gradle、JUnit、Mockito、JVM、GC、线程池、并发等关键词会触发 Java 专项参考；代码优化、性能优化、架构优化、N+1、缓存、异步、性能瓶颈等关键词会触发性能反模式审查与性能基准测试协同。专项参考与代码生成、测试用例生成、API设计、MySQL数据库、性能基准测试等现有子技能协同执行。
 
@@ -96,9 +96,19 @@ Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUni
 
 ## 版本
 
-v1.8.4 | 更新日期: 2026-08-10
+v1.9.0 | 更新日期: 2026-08-11
 
 ## 变更日志
+
+### v1.9.0 (2026-08-11)
+
+- 新增 Step 1.5「需求澄清门控」：复杂任务强制执行，将模糊形容词（快/稳定/安全/好用）转为可验收标准，支持验收口径对齐与假设显式化
+- 新增 Wayfinder 模式：大型模糊任务（如"提升性能""整理代码"）的探索路径——现状快照→问题树展开→候选排序→最小探索→收敛为明确任务
+- code-generation 新增第〇步：TDD 与审查链前置决策——复杂任务在 Spec 检查前自动决策联动 test-generation 和 code-review
+- project-memory-management 新增第三步点六：术语表维护（Glossary）——术语漂移自动记录规范名称，新会话加载确保跨轮统一
+- software-project 新增第三步点五：模块边界审查——5 维审查（依赖方向/接口契约/数据持有/变更半径/术语一致性），循环依赖为阻塞级
+- frontend-design 新增第二步点五：快速原型与草图——ASCII 线框图快速对齐页面骨架和交互流，确认结构后再进入完整视觉设计
+- FAQ 新增第十六节「需求澄清与模块边界」，覆盖门控/wayfinder/边界审查/TDD链/术语表/快速原型 6 问
 
 ### v1.8.4 (2026-08-10)
 
@@ -189,6 +199,16 @@ v1.8.4 | 更新日期: 2026-08-10
 - SKILL.md 增加 Laravel / PHP框架领域路由、优先级矩阵和协同路径
 - 保持 18 个子技能不变，Laravel 专项参考不作为独立 `@` 显式调用标识
 
+### v1.7.0 (2026-07-04)
+
+- frontend-design.md 大幅增强：吸收企业级前端工程规范（来自 frontend-spec）
+- 第四步新增 CSS/SCSS 工程约束：嵌套深度 ≤3、z-index 统一管理、单位优先级、公共样式抽离、禁止硬编码颜色
+- 第七步升级为「可访问性 + 安全性 + 可用性」三步检查：XSS/CSRF/敏感信息/接口权限/第三方脚本 5 条安全红线
+- 第八步新增 5 个子章节：项目目录规范、命名规范、代码质量基线（JS/TS/Vue/React）、ESLint/Prettier 基线、性能实现规范
+- 质量标准追加 5 条新约束（CSS 工程/安全/命名/TS 类型/ESLint）
+- 验证清单追加安全性检查项
+- README 子技能表同步扩展前端设计关键词
+
 ### v1.6.0 (2026-07-04)
 
 - 新增 性能基准测试 子技能（references/performance-benchmark.md）
@@ -199,16 +219,6 @@ v1.8.4 | 更新日期: 2026-08-10
 - SKILL.md 优先级矩阵补全3条缺失条目：Spec驱动开发、Karpathy编码规范、任务拆解与执行
 - 修复3对单向引用：website-project → software-project、code-review → code-generation、tech-selection → software-project
 - 更新子技能数量 17 → 18
-
-### v1.7.0 (2026-07-04)
-
-- frontend-design.md 大幅增强：吸收企业级前端工程规范（来自 frontend-spec）
-- 第四步新增 CSS/SCSS 工程约束：嵌套深度 ≤3、z-index 统一管理、单位优先级、公共样式抽离、禁止硬编码颜色
-- 第七步升级为「可访问性 + 安全性 + 可用性」三步检查：XSS/CSRF/敏感信息/接口权限/第三方脚本 5 条安全红线
-- 第八步新增 5 个子章节：项目目录规范、命名规范、代码质量基线（JS/TS/Vue/React）、ESLint/Prettier 基线、性能实现规范
-- 质量标准追加 5 条新约束（CSS 工程/安全/命名/TS 类型/ESLint）
-- 验证清单追加安全性检查项
-- README 子技能表同步扩展前端设计关键词
 
 ### v1.5.1 (2026-07-02)
 
