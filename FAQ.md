@@ -440,3 +440,80 @@ A：三点打消顾虑，基本“选错无后果”：
 | 先定位瓶颈再重构                  | “这个列表很慢，先帮我定位瓶颈再重构”                | 性能基准测试 + 重构建议（先基线） |
 | 审查完再重构                      | “`@code-review` 先审，`@refactoring` 再按问题改”    | 代码审查(只读) → 重构建议         |
 | 写功能 + 顺带文档                  | “加个导出功能，顺带生成接口文档”                    | 代码生成 + doc-generation         |
+
+## 十九、常见技能实际代码示例（可直接抄用）
+
+上面各节偏步骤与模板；这里补几段**真实可运行**的代码片段，对应高频技能，照抄即可落地。每条都锚定前文规则出处。
+
+### A. 数据库写入：PDO 预处理（替代直拼 SQL）
+
+```php
+// ❌ 直拼（注入风险，违反 二、执行禁区）
+$id = $_GET['id'];
+$sql = "SELECT * FROM user WHERE id = $id";
+
+// ✅ 预处理（mysql-database 规范）
+$stmt = $pdo->prepare("SELECT * FROM user WHERE id = ?");
+$stmt->execute([$id]);
+$row = $stmt->fetch(PDO::FETCH_ASSOC);
+```
+
+> 补充：`IN` 用 `IN (?,?,?)` 占位；`ORDER BY` 走白名单映射；`LIMIT` 转 int；任何 UPDATE/DELETE 必须带 `WHERE` 并先 `SELECT` 验证影响行数（见 十、Q1）。
+
+### B. PHP8 兼容：两个高频修复
+
+```php
+// ❌ 数组键无引号 + fetch1 返 false 未守卫（PHP8 告警/致命）
+$row = $db->fetch1("SELECT * FROM news WHERE id=1");
+echo $row[id];          // Undefined array key（PHP8 报 warning）
+echo $row['title'];     // 若 $row 为 false → 致命错误
+
+// ✅ 加引号 + false 守卫（php8-compat）
+$row = $db->fetch1("SELECT * FROM news WHERE id=1") ?: [];
+echo $row['id'];
+echo $row['title'] ?? '';
+```
+
+> 其余 PHP8 项：短标签 `<?`→`<?php`、`each()`/`create_function()` 替换、`??` 优先级加括号、`class_exists()` 第二参数（见 十一、Q“CMS 二次开发”）。
+
+### C. 代码审查（@code-review）只读报告长什么样
+
+```text
+[代码审查报告] src/Order.php
+- [Bug]     L42  未校验 $qty 上限，可传负数导致库存为负
+- [安全]    L88  直拼 SQL，存在注入（见 mysql-database）
+- [性能]    L120 循环内逐条 SELECT，建议批量 IN 查询
+- [坏味道]  L15  函数 80 行，建议拆 init / calc / final
+建议：先修 [安全][Bug]，再据报告走 @refactoring。
+（本技能只出清单，不自动改写；确认后再改）
+```
+
+> 这正是 十八、所述「审计修复分离」：审查是只读的，要改写须走重构/生成分支并先确认。
+
+### D. PHP 内联 JS：window.open 弹窗居中（Node 校验 + 正确写法）
+
+```html
+<!-- ❌ features 以空串结尾 → 浏览器报 SyntaxError -->
+<button onclick="window.open(u,'','width=600,height=400,left='+(screen.width-600)/2)">打开</button>
+
+<!-- ✅ 坐标用 Math.floor 包裹，末尾真实非空串 -->
+<button onclick="window.open(u,'','width=600,height=400,left='+Math.floor((screen.width-600)/2)+',top='+Math.floor((screen.height-400)/2)+',scrollbars=auto,resizable=yes')">打开</button>
+```
+
+> 校验：`node --check` 对纯 JS 有效；**PHP 文件内联 JS，`php -l` 完全无感**，须把这段 JS 抽出来用 Node 单独跑（见 十四、Q2「CMS / PHP 内联 JS 专项」）。
+
+### E. 长任务检查点（handoff.md 实际内容）
+
+```markdown
+# 交接快照 handoff.md
+## 已完成（带验证证据）
+- 导出接口 POST /api/export ✅ php -l 通过 + curl 返回 200 + 1 万行 CSV
+## 未完成
+- 导出限频未加（待你确认阈值）
+## 阻塞
+- 无
+## 下一步
+- 补限频 → 重跑 lint → 交付
+```
+
+> 每完成一个 Wave 或累计 5 个原子任务落一次，跨会话/换电脑读它即可无损续做（见 九、Q“进度会丢吗”）。
