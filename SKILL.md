@@ -29,18 +29,11 @@ allowed-tools:
 
 每次新会话首次响应前，必须按照 `project-memory-management` 第五步"新会话记忆恢复"的三层加载策略恢复历史上下文。在此基础上，本技能启用**写后即记（ClawMemory 模式）**协议。
 
-**新会话读取协议**（写后即记的前提）
+**写后即记协议**（ClawMemory 模式）
 
-会话开始，在进入 Step 1 之前，必须先读取以下文件获取操作上下文：
+> 进入 Step 1 前的历史记忆恢复，**统一由 Step 1.1 按 `project-memory-management` 第五步「新会话记忆恢复」三层策略执行**（读取文件集、层级、截断规则均以该节为准）。本步骤不再重复定义读取协议，避免恢复文件集冲突与重复触发。
 
-| 读取目标              | 范围               | 用途                             |
-| --------------------- | ------------------ | -------------------------------- |
-| `{YYYYMMDD}/daily.md` | 今天 + 昨天        | 获取最近操作详情                 |
-| `project_memory.md`   | 全量（按截断规则） | 获取项目约定、已知问题、历史决策 |
-
-读取规则详见 `project-memory-management`「读取截断规则」。两者与 Step 1.1 三层策略（L1 topics / L2 session / L3 references）互补：L1-L3 提供会话级骨架，daily.md 提供操作级细节，project_memory.md 提供项目级积累。
-
-读取 `project_memory.md` 时，优先定位「Glossary 术语表」节并加载，确保本轮对话使用的术语定义与历史记录一致。术语表格式与维护规则见 `project-memory-management` 第三步点六。
+读取 `project_memory.md` 时，优先定位「Glossary 术语表」节并加载，确保本轮对话使用的术语定义与历史记录一致。术语表格式与维护规则见 `project-memory-management` 第三步点五。
 
 ---
 
@@ -73,7 +66,7 @@ allowed-tools:
 
 ---
 
-**运行位置**：此协议运行在六步闭环工作流内。每完成一个 Step，若触及上述触发条件，即时追加到 `daily.md`；Step 6 的完整 Session Summary 仍按正常流程写入 `session_memory_{id}.jsonl`，两者互补不重复——`daily.md` 记录操作点滴，`session_memory` 记录会话全貌。
+**运行位置**：此协议运行在六步闭环工作流内。每完成一个 Step，若触及上述触发条件，即时追加到 `daily.md`；Step 6 的完整 Session Summary 仍按正常流程写入 `session_memory_{id}.jsonl`，两者互补不重复——`daily.md` 逐 Step 记录操作细节，`session_memory` 记录完整会话摘要。
 
 ### Step 1: 分析指令 — 意图识别与路由匹配
 
@@ -169,7 +162,7 @@ allowed-tools:
 4. **最小探索动作**：对排名第一的候选路径执行一个只读验证动作（如跑一次 lint、查一个慢查询、读一个核心文件），根据结果收敛或调整方向
 5. **收敛为明确任务**：将验证后的路径转为 1-2 句可验收的任务描述，回到 Step 1.5 的验收口径对齐
 
-此路径仅在用户需求描述不足 30 字、且无历史上下文可推断时启用。已有明确目标的复杂任务直接走 Step 1.5 门控。
+此路径是 Step 1.5 的**前置探索态**，二者不互斥：Wayfinder 仅负责把模糊方向收敛为明确任务，收敛后回到 Step 1.5 做验收口径对齐（Step 1.5 的 20 字阈值门控照常生效）。仅在用户需求描述不足 30 字、且无历史上下文可推断时启用 Wayfinder；已有明确目标的复杂任务直接走 Step 1.5 门控。
 
 ### Step 2: 制定方案 — 加载模板与前置检查
 
@@ -179,7 +172,7 @@ allowed-tools:
    - 涉及生产配置、数据库写入、权限、凭证、隐私或不可回滚操作时，立即触发安全闸门，退出快速通道
    - 业务规则、数据影响、权限边界、验收口径不明时，按澄清策略分级（高/中/低，定义见 [./references/execution-safety.md]「澄清策略分级」）决定是否补问
 3. **规划门禁（PLAN-GATE）**：复杂任务进入修改阶段前，必须按 [./references/execution-safety.md]「规划门禁」逐项打勾。Trivial Fix（单文件 ≤ 1 行，无结构变更）可跳过；若通过后触发异常则强制中止。未通过任一项 → 不退到修改阶段，先补齐缺口。
-4. **复杂任务依赖分析（P1，项目知识图谱）**：意图三分法 = 复杂任务（≥3 文件 / 跨模块）进入方案阶段时，先查图谱依赖闭包——`python scripts/build_graph.py --root {PROJECT_ROOT} --query <改动文件1,改动文件2,…> --direction both --depth 3`（查前自动走 §6 哈希新鲜度校验，过期则重建），**非项目全量**，将依赖矩阵喂入 `_plan.md`，替代临时 grep。简单任务 / 单文件（L0）跳过此步（图谱是噪声）。查后须按图谱子技能「查后动作规范」+ 硬门禁 G1/G2'/G3 执行——图谱仅作加速器，动刀前 grep 复核那一下不能省。
+4. **复杂任务依赖分析（P1，项目知识图谱）**：意图三分法 = 复杂任务（≥3 文件 / 跨模块）进入方案阶段时，先查图谱依赖闭包——`python scripts/build_graph.py --root {PROJECT_ROOT} --query <改动文件1,改动文件2,…> --direction both --depth 3`（查前自动走 §6 哈希新鲜度校验，过期则重建），**非项目全量**，将依赖矩阵喂入 `_plan.md`，替代临时 grep。简单任务 / 单文件（L0）跳过此步（图谱是噪声）。查后须按图谱子技能「查后动作规范」+ 硬门禁 G1/G2'/G3 执行——图谱仅作加速器，动刀前 grep 复核那一下不能省。**性能提示**：同一 Wave 内首次查询走新鲜度检测；同 Wave 后续步骤若源码未变，加 `--no-rebuild` 直接复用缓存图谱，避免每步全仓哈希重算（大仓显著提速）。仅在 Wave 首步或拓扑变更时省略 `--no-rebuild`。
 
 5. **确认输入与验收口径**：模板中标注「必填」的输入项缺失时，向用户索取；明确本轮验收标准与证据要求。
 
@@ -190,13 +183,13 @@ allowed-tools:
 - **执行前局部影响面（P2，项目知识图谱）**：Step 3 要改具体模块前，先查图谱该模块 2 跳上游——`python scripts/build_graph.py --root {PROJECT_ROOT} --query <模块> --direction up --depth 2`（查前自动走 §6 哈希新鲜度校验），将上游依赖方纳入改动影响评估范围，受影响文件在修改阶段一并改、验证阶段一并跑 lint/断言。图谱结论必须独立 grep 复核（见 `project-knowledge-graph` 硬门禁 G1 grep 冲突以 grep 为准 / G2' 须附 grep 证据 / G3 不可逆操作不单凭图谱），**图谱仅作加速器，不替代 grep 复核**。
 - **写码前实码确认**：修改/生成代码前，`read_file` 目标文件 + `search_content` 搜关联引用 + 冲突检查，三项均完成后才进入修改。跳过任一项 → 退回 Step 2。
 - **审计修复分离**：代码审查、Bug 诊断、重构建议场景，审计阶段只读不改码。审计结论输出（问题定位/根因/影响范围/修复方向/验证方式）确认后才进入修复。
-- **不卡死计数器**：同一诊断点连续失败 ≥ 3 次 → 暂停，列 2-3 条替代方案交用户选。
+- **不卡死计数器**：同一诊断点连续失败 ≥ 3 次 → 暂停，列 2-3 条替代方案（标注**推荐项**并标记**已验证 / 未验证**）交用户选；5 分钟无回复 → 仅当推荐项**已验证**时按推荐项自动推进，不纯卡死（保留 SELF-AUDIT 兜底复检）；若推荐项**未验证**或各方案均存疑 → 仍交用户决策，不自动推进带病方案。
 - **批量修改 7 防线**：同操作 ≥ 3 文件或 ≥ 10 处修改点时启用（预检→试点→备份→执行→后检→MD5→回读）。
 - **清单化质量自审 / 安全红线**：代码落笔前对照清单自审（收口于 Step 4 SELF-AUDIT）。
 
 严格按加载的模板逐步执行，每轮改动后立即运行对应验证。遵守 Karpathy 规范、非 Git 安全协议、上下文延迟加载协议。
 
-**TDD 与审查链前置判定**：复杂代码生成任务（涉及 ≥3 文件或 ≥2 模块），进入 `code-generation` 模板后按其第〇步自动判定是否联动 `test-generation` 和 `code-review`，判定结果写入执行计划，不得跳过。
+**TDD 与审查链前置判定**：复杂代码生成任务（涉及 ≥2 模块联动、数据持久化、网络通信或安全敏感，或代码预计 >200 行），进入 `code-generation` 模板后按其第〇步自动判定是否联动 `test-generation` 和 `code-review`，判定结果写入执行计划，不得跳过。
 
 ### Step 4: 验证结果 — 证据采集与自检
 
@@ -205,7 +198,7 @@ allowed-tools:
 对照模板质量标准逐条验证，并执行以下自检：
 
 1. **清单化验证**：按 [./references/execution-safety.md]「清单化质量自审」10 条 +「安全红线清单」10 条逐项打勾，任一 ❌ 回退 Step 3 修复。
-2. **内联 JS 专项**：PHP 内联 JS 必须通过三道强制校验（引号配对 / `window.open` features 非空收尾 / 批量全仓 Node 校验），详见 [./references/javascript-development.md]「CMS / PHP 内联 JS 专项」。
+2. **内联 JS 校验**：PHP 内联 JS 必须通过三道强制校验（引号配对 / `window.open` features 非空收尾 / 批量全仓 Node 校验），详见 [./references/javascript-development.md]「CMS / PHP 内联 JS」。
 3. **采集验证证据**（以下之一）：
 
 | 证据类型  | 适用场景                        | 最小字段                               |
@@ -223,7 +216,7 @@ allowed-tools:
 
 按模板规定的格式输出结果。如果模板要求生成文件，写入后声明产出物。交付必须包含：
 
-- **执行率自检（SELF-AUDIT）**：按 [./references/delivery-assurance.md]「执行率自检」11 条逐项打勾，任一项 ❌ 回退对应阶段修复 → 重走 Step 4 → 复检。最多 3 轮，超出 → 列未修复项 + 原因 + 选项。
+- **执行率自检（SELF-AUDIT）**：按 [./references/delivery-assurance.md]「执行率自检」15 条逐项打勾，任一项 ❌ 回退对应阶段修复 → 重走 Step 4 → 复检。最多 3 轮，超出 → 列未修复项 + 原因 + 选项。
 - **变更摘要**（改了哪些文件、为什么改）
 - **验证证据**（Step 4 采集的结果）
 - **已知限制与剩余风险**
@@ -244,11 +237,9 @@ allowed-tools:
 3. **Convention Capture**：新规范/编码约定/陷阱防范，提炼为可复用检查清单
 4. **已知问题清单**：新 Bug 模式、兼容性陷阱、第三方依赖风险
 5. **记忆维护检查**：若当日日志 `daily.md` 超过 8000 字符，触发精简提醒；若存在超过 30 天的日志目录，触发蒸馏提示（详见 `project-memory-management.md` 记忆维护协议）
-6. **术语漂移记录**：本轮出现的新术语定义或已有术语含义变更，追加到 `project_memory.md` 的 Glossary 节，格式为「术语名 | 规范名称 | 定义 | 记录日期」。详见 `project-memory-management` 第三步点六。
+6. **术语漂移记录**：本轮出现的新术语定义或已有术语含义变更，追加到 `project_memory.md` 的 Glossary 节，格式为「术语名 | 规范名称 | 定义 | 记录日期」。详见 `project-memory-management` 第三步点五。
 
 7. **踩坑错误册更新**：凡本轮新踩且排查耗时 ≥ 40 分钟的坑，按 [./references/error-ledger.md] 强制记录（分配 ERR-ID + 写单条 + 更新索引 + 同步 project_memory.md Known Issues 缩写引用）。Bug 诊断/审查/重构 session 启动时先查索引匹配触发关键词，命中则读对应 ERR-ID 全文复用修复方式。
-
-复盘完成后，本轮主线才算真正闭环。
 
 ## 非 Git 文件操作安全协议
 
@@ -291,7 +282,7 @@ allowed-tools:
 | CMS二次开发      | PHP+MySQL CMS 二次开发全链路指引：CMS探测、PHP版本选型、数据库规范、PHP8兼容、安全红线、插件开发。                                                                     |
 | 前端设计         | UI/UX 与前端实现设计：设计思维、信息架构、视觉规范、品牌、Banner、图标、社媒图、响应式、可访问性、安全性、命名规范、目录规范、代码质量、ESLint、性能实现、浏览器验证。 |
 | MySQL数据库      | MySQL 数据建模、SQL安全、索引设计、事务边界、慢查询诊断、迁移回滚和数据安全。                                                                                          |
-| 项目知识图谱     | 为项目自动构建代码结构依赖图谱（节点+依赖边），跨模块改动/重构/审查时查依赖闭包与影响面，agent 开发时借全局视角理解项目、定位更准改动更稳；纯 agent 受众，不生成 mermaid 可视化。 |
+| 项目知识图谱     | 为项目自动构建代码结构依赖图谱（节点+依赖边），跨模块改动/重构/审查时查依赖闭包与影响面，供 agent 获取全局依赖视角、提升改动定位准确度；纯 agent 受众，不生成 mermaid 可视化。 |
 
 ## 领域路由表
 
@@ -309,7 +300,7 @@ allowed-tools:
 | API / 长任务接口  | REST、GraphQL、接口契约、AJAX、Init-Step-Poll、轮询                                                                          | `api-design`                            | `frontend-design`, `cms-development`                                                | 长任务必须采用 Init-Step-Poll 架构                                                                                                                                                                                                   |
 | Laravel / PHP框架 | Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUnit、PHPStan                                          | `laravel-development`                   | `code-generation`, `test-generation`, `laravel-testing`, `mysql-database`           | 仅在确认 Laravel 项目后加载；不得套用到未确认框架的 CMS 项目                                                                                                                                                                         |
 | Java / Spring     | Java、Spring Boot、Spring、MyBatis、Hibernate、JPA、Maven、Gradle、JUnit、Mockito、JVM、GC、线程池、并发                     | `java-development`                      | `code-generation`, `code-review`, `test-generation`, `performance-benchmark`        | 仅在确认 Java 项目后加载；Java 17/21 特性必须先确认运行版本支持                                                                                                                                                                      |
-| JavaScript        | JavaScript、JS、ES6、ES module、CommonJS、JS 风格规范、JS 代码检查、全角符号修复、PHP 内联 JS、window.open、onclick 事件属性 | `javascript-development`                | `code-generation`, `code-review`, `bug-diagnosis`, `api-design`, `software-project` | 仅在确认 JS 项目后加载；TypeScript 项目由其类型系统承担约束；Node.js 版本需 >= 15（推荐 18+）；JS 写在 PHP 文件内联时须额外走「CMS / PHP 内联 JS 专项」三道强制校验（引号配对 / window.open features 非空收尾 / 批量全仓 Node 校验） |
+| JavaScript        | JavaScript、JS、ES6、ES module、CommonJS、JS 风格规范、JS 代码检查、全角符号修复、PHP 内联 JS、window.open、onclick 事件属性 | `javascript-development`                | `code-generation`, `code-review`, `bug-diagnosis`, `api-design`, `software-project` | 仅在确认 JS 项目后加载；TypeScript 项目由其类型系统承担约束；Node.js 版本需 >= 15（推荐 18+）；JS 写在 PHP 文件内联时须额外走「CMS / PHP 内联 JS」三道强制校验（引号配对 / window.open features 非空收尾 / 批量全仓 Node 校验） |
 | CMS / PHP         | CMS、EmpireCMS、WordPress、ThinkPHP、PHP8兼容、插件、模板                                                                    | `cms-development`                       | `mysql-database`, `bug-diagnosis`, `code-generation`                                | 未确认 CMS 类型前禁止生成框架特定代码                                                                                                                                                                                                |
 | MySQL / 数据库    | 表结构、SQL、索引、事务、慢查询、EXPLAIN、迁移、回滚                                                                         | `mysql-database`                        | `cms-development`, `software-project`                                               | 写操作必须先确认影响范围和回滚路径                                                                                                                                                                                                   |
 | 前端 / 视觉       | UI、UX、页面、响应式、品牌、Banner、图标、浏览器验证                                                                         | `frontend-design`                       | `code-generation`, `website-project`                                                | 先输出设计约束，再进入实现                                                                                                                                                                                                           |
@@ -328,6 +319,10 @@ allowed-tools:
 | `laravel-testing`        | [./references/laravel-testing.md]        |
 | `java-development`       | [./references/java-development.md]       |
 | `javascript-development` | [./references/javascript-development.md] |
+| `execution-safety`       | [./references/execution-safety.md]       |
+| `delivery-assurance`     | [./references/delivery-assurance.md]     |
+| `error-ledger`           | [./references/error-ledger.md]           |
+| `project-knowledge-graph`| [./references/project-knowledge-graph.md] |
 
 ## 子技能索引
 
@@ -373,7 +368,7 @@ allowed-tools:
 | 任何子技能 + "记录决策"                                | 当前子技能 + 项目记忆管理        | 主任务优先，记忆作为附属步骤                                                      |
 | "CMS二次开发" + "写代码"                               | CMS二次开发 + 代码生成           | CMS规范优先，代码生成遵循CMS数据访问层和安全红线                                  |
 | "帝国CMS/WordPress" + "报错"                           | Bug诊断                          | CMS关键词触发Bug诊断时自动加载CMS常见Bug模式                                      |
-| "PHP" + "代码审查"                                     | 代码审查 + CMS二次开发(自动)     | 审查PHP代码时自动追加CMS安全审查清单                                              |
+| "PHP" + "代码审查"                                     | 代码审查 + CMS二次开发  | 审查PHP代码时自动追加CMS安全审查清单                                              |
 | "Laravel/Eloquent/Blade/artisan" + "写代码/改功能"     | 代码生成 + Laravel专项参考       | Laravel 框架约定优先，按需加载 `laravel-development`                              |
 | "Laravel/PHPUnit/Pest/Feature Test" + "测试"           | 测试用例生成 + Laravel测试参考   | Laravel 测试优先使用 Feature Test、Factory、Facade fake 和数据库断言              |
 | "Java/Spring Boot/MyBatis/JPA" + "写代码/改功能"       | 代码生成 + Java专项参考          | Java/Spring 分层、事务、数据访问和异常处理规则优先，按需加载 `java-development`   |
@@ -495,7 +490,7 @@ allowed-tools:
 
 ### 长任务执行可靠性（L0，不可绕过）
 
-长任务须保证中途可恢复、结束有可靠产出物（与产品侧 Init→Step→Poll 为两层，见对应 reference）。
+长任务须保证中途可恢复、结束有可靠产出物（与产品侧 Init→Step→Poll 构成两层协议，见对应 reference）。
 
 - **轮次上限仅约束单 Wave**：「安全最大轮次 = 6」不跨 Wave 累计。大任务应 Wave 拆分 + 跨会话 `handoff.md` 续做；已验证 Wave 产出物不回退清零。
 - **周期性检查点**：每完成一个 Wave 或累计 5 个原子任务，落 `.ai-memory/handoff.md` 检查点：`已完成项(带验证证据)` → `相关文件` + `未完成项(下一步)` + `阻塞项`。目的：上下文压缩/崩溃后无损续做。
@@ -522,9 +517,7 @@ allowed-tools:
 
 ## 项目启动模板
 
-软件/网站项目总控第一步必填；其他多文件复杂任务建议填写：
-
-处理复杂编程任务时，启动前填写：
+软件/网站项目总控第一步必填；其他多文件复杂任务启动前建议填写：
 
 ```markdown
 ## 项目启动信息

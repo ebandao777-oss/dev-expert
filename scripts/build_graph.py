@@ -258,6 +258,14 @@ def file_hash(path):
         return None
 
 
+def _safe_mtime(path):
+    """返回文件 mtime；异常返回 None（need_rebuild 的廉价新鲜度前置过滤用）。"""
+    try:
+        return os.path.getmtime(path)
+    except Exception:
+        return None
+
+
 def detect_lsp(root):
     """规划 §5.1 运行时 LSP 探测（仅记录可用性，v1 抽取仍走正则）。"""
     import shutil
@@ -791,6 +799,7 @@ def build(root):
         'tool_version': '1.0.0',
         'root': root,
         'file_hashes': {f: file_hash(os.path.join(root, f)) for f in file_list},
+        'file_mtimes': {f: _safe_mtime(os.path.join(root, f)) for f in file_list},
         'lsp_available': lsp,
         'accuracy_report': {
             'edges_total': len(edges),
@@ -931,6 +940,7 @@ def need_rebuild(root):
         return True, 0
     changed = 0
     current_rels = set()  # B3：记录当前仍存在源文件，用于检测"删除"
+    mtimes = meta.get('file_mtimes', {})  # 廉价 mtime 前置过滤：mtime 未变则内容必未变
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS
                        and not d.startswith('.')]
@@ -939,6 +949,9 @@ def need_rebuild(root):
                 p = os.path.join(dirpath, fn)
                 rel = os.path.relpath(p, root).replace(os.sep, '/')
                 current_rels.add(rel)
+                # mtime 一致（含旧版无 file_mtimes 时 mtimes={} → 不触发，回退全量 md5）
+                if rel in mtimes and mtimes[rel] == _safe_mtime(p):
+                    continue
                 h = file_hash(p)
                 if rel not in meta.get('file_hashes', {}) or meta['file_hashes'][rel] != h:
                     changed += 1
@@ -958,6 +971,8 @@ def main():
     ap.add_argument('--direction', default='both', choices=['up', 'down', 'both'])
     ap.add_argument('--depth', type=int, default=2)
     ap.add_argument('--rebuild', action='store_true', help='强制全量重建')
+    ap.add_argument('--no-rebuild', action='store_true',
+                    help='跳过新鲜度检测，直接复用已缓存图谱（仅在确认图谱新鲜的连续查询时使用）')
 
     ap.add_argument('--selftest', action='store_true',
                     help='运行内置 E2E 自检（删文件无悬挂边 + 改文件过期判定），不改交付物')
@@ -1009,14 +1024,17 @@ def main():
         build(root)
         return
     if args.query:
-        stale, n = need_rebuild(root)
-        # B1：meta.json 在但 graph.json/symbols.json 缺失（被误删/损坏）→ 即便源码未变也必须重建，
-        # 否则下方直接 open(graph.json) 会抛 FileNotFoundError 崩溃。
-        if stale or not _graph_files_present(root):
-            print(f"[GRAPH-STALE] 图谱可能过期（{n} 个文件变更/产物缺失），正在增量重建…")
-            build(root)  # v1 增量=全量重抽（四类覆盖在 build 内统一处理）
+        if args.no_rebuild and _graph_files_present(root):
+            print('[GRAPH-USED-CACHE] 跳过新鲜度检测，复用已缓存图谱')
         else:
-            print(f"[GRAPH-FRESH] 图谱新鲜（{n} 变更）")
+            stale, n = need_rebuild(root)
+            # B1：meta.json 在但 graph.json/symbols.json 缺失（被误删/损坏）→ 即便源码未变也必须重建，
+            # 否则下方直接 open(graph.json) 会抛 FileNotFoundError 崩溃。
+            if stale or not _graph_files_present(root):
+                print(f"[GRAPH-STALE] 图谱可能过期（{n} 个文件变更/产物缺失），正在增量重建…")
+                build(root)  # v1 增量=全量重抽（四类覆盖在 build 内统一处理）
+            else:
+                print(f"[GRAPH-FRESH] 图谱新鲜（{n} 变更）")
         with open(os.path.join(kg_dir, 'graph.json'), encoding='utf-8') as f:
             graph = json.load(f)
         with open(os.path.join(kg_dir, 'meta.json'), encoding='utf-8') as f:

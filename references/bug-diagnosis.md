@@ -7,6 +7,39 @@
 3. **运行环境**（可选）：操作系统、语言版本、依赖版本
 4. **复现步骤**（可选）：如何触发这个错误
 
+### 输出示例
+
+````
+## Bug诊断报告
+
+**错误类型**：运行时（白屏 500）
+**错误信息**：Uncaught TypeError: Cannot access offset of type bool
+**发生位置**：e/class/functions.php / GetFcache / 第 204 行
+
+## 根因分析
+**问题描述**：反序列化缓存后未做类型校验，直接当下标访问。
+**详细分析**：`unserialize` 失败返回 `false`（bool）；旧缓存格式非数组时，直接 `$cache['key']` 在 PHP 8.1+ 触发 TypeError。
+**相关代码**：
+```php
+$cache = unserialize($str);
+return $cache['key'];   // unserialize 失败返 false(bool) 时当下标访问报 TypeError
+```
+
+## 修复方案
+```php
+$cache = unserialize($str);
+if (!is_array($cache)) return '';
+return $cache['key'] ?? '';
+```
+
+## 验证方法
+1. `php -l` 语法通过
+2. 用旧格式缓存触发该路径，确认不再白屏
+
+## 预防措施
+- 反序列化结果先做 is_array 校验再访问下标
+````
+
 ## 执行流程
 
 ### 第一步：Spec场景检查

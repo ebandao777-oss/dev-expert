@@ -49,7 +49,7 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 - `{PROJECT_ROOT}`：按上述探测协议动态获取，禁止硬编码
 - `{USER_PROFILE}`：按上述探测协议动态获取，禁止硬编码
 - `{YYYYMMDD}`：当日日期，目录不存在时由记忆系统自动创建
-- `{session-id}`：会话标识，取 chat session 的前 12 位
+- `{session-id}`：会话标识，格式为 `YYYYMMDD-HHmm`（本次会话首次进入 Step 1 的本地时间戳，到分钟）。**唯一生成/存储约定以 `references/execution-safety.md`「session_memory 标识（id）生成规则」为准**：写进当日 `daily.md` 顶部 `session-id: {YYYYMMDD-HHmm}` 行作为真相源，新会话先读该行再定位 `session_memory_{session-id}.jsonl`。
 
 ### `.ai-memory/` 目录结构示例
 
@@ -61,8 +61,8 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 │   ├── 20260705/                        # L2/L1 按日期组织
 │   │   ├── topics.md                    # L1 当日会话主题摘要
 │   │   ├── daily.md                     # L1 当日逐条操作日志（append-only）
-│   │   ├── session_memory_6a4840b8.jsonl # L2 单次会话记录
-│   │   └── session_memory_7b5c3e91.jsonl
+│   │   ├── session_memory_20260813-1430.jsonl # L2 单次会话记录（id=YYYYMMDD-HHmm）
+│   │   └── session_memory_20260813-1510.jsonl
 │   └── 20260706/
 │       └── ...
 ├── .gitignore                           # 建议 .ai-memory/daily/ 加入忽略
@@ -155,7 +155,7 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 - [新发现的项目规范]
 ```
 
-> 模板必填项缺一不可。写入位置：`{PROJECT_ROOT}/.ai-memory/{YYYYMMDD}/session_memory_{session-id}.jsonl` + `{PROJECT_ROOT}/.ai-memory/{YYYYMMDD}/topics.md`
+> 模板必填项缺一不可。Session Summary 全文写入 `{PROJECT_ROOT}/.ai-memory/{YYYYMMDD}/session_memory_{session-id}.jsonl`；同时向 `{PROJECT_ROOT}/.ai-memory/{YYYYMMDD}/topics.md` 写入「5 字段主题摘要」（项目 / 当前阶段 / 活跃任务 / 上次会话 / 交接状态，格式见第五步 Layer 1），供新会话快速恢复，**不写全文**。
 
 ### 第二步：决策记录（Decision Record）
 
@@ -221,7 +221,7 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 
 > 模板必填项缺一不可。
 
-### 第三步点六：术语表维护（Glossary）
+### 第三步点五：术语表维护（Glossary）
 
 当对话中出现领域术语漂移（同一概念被多个名称指代、或不同概念被同一名称覆盖）时，记录到项目级术语表。
 
@@ -251,7 +251,7 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 - 发现术语表与当前使用不一致时，以术语表为准并提醒用户
 - 新会话 Step 1.1 加载 project_memory.md 时，Glossary 章节随 Section Headers 一并加载
 
-### 第三点五步：已知问题清单（Known Issues）
+### 第三步点六：已知问题清单（Known Issues）
 
 发现新 Bug 模式、兼容性陷阱、第三方依赖风险时记录到 `{PROJECT_ROOT}/.ai-memory/project_memory.md` 的"Lessons Learned"章节：
 
@@ -395,7 +395,7 @@ LLM 在首次写入或读取记忆前，必须按以下优先级链探测两个�
 
 ### 读取截断规则
 
-从 Step 0 新会话读取协议调用，用于控制单次加载量，避免上下文溢出：
+从 Step 0 / Step 1.1 新会话恢复调用，用于控制单次加载量，避免上下文溢出：
 
 | 文件 | 阈值 | 读取动作 |
 | ----------------- | ------------ | -------- |

@@ -110,6 +110,12 @@ The system MUST [新行为描述].
 
 - Decision: [决策点]
   - Reason: [选择理由]
+  - **Alternatives Considered**: [被否决的候选方案]
+  - **Rejected Because**: [反选理由 / 该候选的 trade-off 为何不可接受]
+  - **Trade-offs Accepted**: [本方案接受的代价与已知技术债]
+  - **Revisit When**: [什么条件下重新评估此决策]
+
+> ⚠️ 重点：存在**多候选方案 / 高影响决策**时，必须显式写出「反选理由」与「接受的代价」，仅给最终方案视为不完整——这是把架构权衡推理外显、防止盲执行的核心要求。单一合理实现的低复杂度改动可跳过反选论证，避免"澄清过度"反模式。
 
 ### File Changes
 
