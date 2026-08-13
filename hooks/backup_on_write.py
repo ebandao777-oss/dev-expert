@@ -18,7 +18,7 @@ import shutil
 import filecmp
 
 # 保留最近 N 个历史版本（.bak / .bak.1 / .bak.2）
-MAX_VERSIONS = 3
+MAX_VERSIONS = 10
 
 # 仅备份源码/配置类文件，避免 .bak 污染图片等二进制
 BACKUP_EXT = {
