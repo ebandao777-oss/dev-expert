@@ -4,6 +4,7 @@
 
 - 对落在「核心/危险目录」的源码文件写操作拦截；tests/、Plan/、依赖/资源目录不拦。
 - 拦截条件：目标在核心目录 且 其 workspace 的 Plan/ 下无任何状态为 规划中/进行中 的 *_plan.md。
+- 放行条件（有意例外）：workspace 未建立 Plan/ 目录（无 Plan 体系）时自动放行，避免误伤不采用本工作流的项目。此行为与「强制规划」措辞一致——§13 面向已采用 Plan 体系的项目。
 - 命中 exit 2 阻断，提示先建计划（Trivial Fix 通道见 Rules §14，但核心目录改动仍强制规划）。
 
 可配置（环境变量，分号分隔，未设置时用默认值）：
@@ -46,8 +47,10 @@ TARGET_EXTS = _split_env(
     {".php", ".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".go", ".vue"},
 )
 
-# 「## 状态」标题行（§13 模板为独占一行，状态值在同行或下一行）
-HEAD_RE = re.compile(r'^##\s*状态\s*[:：]?$')
+# 状态标题行：兼容两种写法，与 handoff_snapshot.py 判定统一。
+#   ①「## 状态」独占一行、状态值写在下一行（§13 canonical 模板）
+#   ②「## 状态: 进行中」状态值同行带在冒号后（delivery-assurance.md 写法）
+# 不再用严格正则锚定行尾，避免漏匹配「同行带值」格式导致误拦。
 
 
 def find_workspace(path):
@@ -65,7 +68,8 @@ def find_workspace(path):
 def has_active_plan(workspace):
     """Plan/*.md 中存在状态为 规划中/进行中 的计划即视为激活。
 
-    状态值按实际格式落在「## 状态」同行或下一行（§13 模板为独占一行）。
+    状态值可落在「## 状态」同行（## 状态: 进行中）或下一行（§13 canonical 模板），
+    两种写法均识别，与 handoff_snapshot.py 的 startswith("## 状态") 判定保持一致。
     """
     plan_dir = os.path.join(workspace, "Plan")
     if not os.path.isdir(plan_dir):
@@ -80,13 +84,15 @@ def has_active_plan(workspace):
         except OSError:
             continue
         for i, line in enumerate(lines):
-            if not HEAD_RE.match(line.strip()):
+            stripped = line.strip()
+            if not stripped.startswith("## 状态"):
                 continue
-            # 同行或下一行含 规划中/进行中 即激活
-            if re.search(r'(规划中|进行中)', line):
-                return True
-            if i + 1 < len(lines) and re.search(r'(规划中|进行中)', lines[i + 1]):
-                return True
+            # 状态值可同行，或标题后隔空行/说明行出现；向后扫到下一个「## 」标题为止
+            for j in range(i, min(i + 4, len(lines))):
+                if j != i and lines[j].strip().startswith("## "):
+                    break  # 已越过下一个标题，本段无激活状态
+                if re.search(r'(规划中|进行中)', lines[j]):
+                    return True
     return False
 
 

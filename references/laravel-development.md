@@ -1,4 +1,4 @@
-# Laravel 专项开发
+﻿# Laravel 专项开发
 
 > 本文件是 `dev-expert` 的 Laravel/PHP 框架专项补充参考，不作为独立子技能计数，也不提供 `@` 显式调用入口。命中 Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUnit、PHPStan 等信号时，按需与 `code-generation`、`cms-development`、`mysql-database`、`api-design`、`software-project` 协同加载。
 
@@ -38,7 +38,7 @@
 ## 常见生产坑
 
 | 场景 | 风险 | 处理方式 |
-| ---------------------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| - | - | - |
 | `Model::where()->update()` | 跳过 Eloquent observer、audit、model events | 需要事件时用 `lockForUpdate() + save()`；确实批量绕过时写明原因 |
 | `attach/detach/sync/updateExistingPivot` | 直接写 pivot 表，不触发 pivot model events | 需要审计时把 pivot 建成真实模型并通过模型写入 |
 | Observer 删除文件 | 父级路径清理可能误删兄弟记录文件 | 删除动作限定到当前记录路径，复杂清理交给 Action |

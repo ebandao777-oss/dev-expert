@@ -1,25 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-build_graph.py — dev-expert 项目知识图谱构建/查询工具
+build_graph.py — 项目知识图谱构建/查询工具（dev-expert）。
 
-设计目标：
-  - 工具侧正则抽取，输出写盘 {root}/.ai-memory/knowledge-graph/{graph.json,meta.json,symbols.json,graph.md}，不进 LLM 上下文（构建 token ≈ 0）。
-  - 边类型：include/use/autoload/extends/template/tpimport/import/cssimport/asset/calls。
-    跨语言抽取：PHP include/require + define() 常量链（含 ABSPATH.WPINC 等）、命名空间 use/extends、
-    非 PHP（py/js/ts/java）模块导入、CSS @import、HTML link/script 资源、ThinkPHP import()/vendor()/Loader::import()、
-    composer PSR-4/PSR-0 命名空间映射（fqn_to_file）、模板 {include file=}。
-  - 存储结构见上；graph.md 为人类可读兜底（agent 不加载）。
-  - 查询：--query <file|symbol> [--direction up|down|both] [--depth N] 返回裁剪子图（默认 2 跳，MAX_NODES=80 封顶）。
-    注：--query 入口会先比对 mtime+内容哈希做新鲜度检测，过期则 [GRAPH-STALE] 并全量重建（v1 无独立增量逻辑，增量=全量重抽）。
-  - 冷启动：图不存在 → 当场全量构建。
-  - 环检测：遍历维护 visited，遇环折叠标 cycle（环边引用的祖先节点一并补入子图，见 B-2）。
-  - 悬空边：构建时 add_edge_if_exists 对目标不存在/项目外绝对路径的边不进图，仅记入 meta.dangling_edges（非事后反查）。
-  - accuracy_report：edges_valid（已存在目标）/edges_dangling/include_total/include_valid/static_coverage(include 解析率) 等。
-    注：符号孤儿检测当前为占位（orphan_symbols 恒空），未实现"孤儿告警"，留口。
-  - LSP 探测（detect_lsp）：仅 shutil.which('intelephense'/'phpactor') 探测 PHP 可用性并记 lsp_available；
-    其余语言（js/python/java/go）硬编码 False。LSP 仅记录可用性，抽取仍走正则（可选增强留口）。
-  - 纯 v1 正则实现（无 AST/tree-sitter）。
+正则抽取，结果写盘 {root}/.ai-memory/knowledge-graph/{graph.json,meta.json,symbols.json,graph.md}（不进 LLM 上下文）。
+边类型：include/use/autoload/extends/template/tpimport/import/cssimport/asset/calls（跨 PHP/JS/TS/Java/Py/CSS/HTML 多语言）。
+查询：--query <file|symbol> [--direction up|down|both] [--depth N] 裁剪子图（默认 2 跳，MAX_NODES=80）。
+--query 入口先比对 mtime+内容哈希做新鲜度检测，过期则全量重建（v1 增量=全量重抽）。
+约束：graph.md 仅人类兜底（agent 不加载）；符号孤儿检测占位未实现（留口）；LSP 仅记录可用性、抽取仍走正则（留口）；纯 v1 正则、无 AST/tree-sitter。
 """
 import argparse
 import hashlib
@@ -77,7 +65,6 @@ RE_CLASS = [
 RE_NAMESPACE = re.compile(r"^\s*namespace\s+([\w\\]+)\s*;", re.M)
 RE_USE = re.compile(r"^\s*use\s+([\w\\]+)(?:\s+as\s+(\w+))?\s*;", re.M)
 RE_NEW_FQN = re.compile(r"new\s+\\?([\w\\]+)\s*\(")            # new \App\X 或 new App\X
-RE_FQN_CALL = re.compile(r"\\?([\w\\]+)::")                     # \App\X::method
 # ---------- 非 PHP 语言模块导入（覆盖 Django/Flask/Spring/Express/NestJS/Next/React/Vue/Angular/Strapi） ----------
 RE_PY_IMPORT = re.compile(r"^\s*(?:from\s+([\w.]+)\s+import\s+\w+|import\s+([\w.]+))", re.M)
 RE_JS_REQUIRE = re.compile(r"require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)")
@@ -103,10 +90,8 @@ RE_HTML_SCRIPT = re.compile(r"<script\b[^>]*\bsrc\s*=\s*['\"]([^'\"]+)['\"]", re
 def _resolve_const_include(head, lit, rel, const_table, root):
     """解析 require 表达式里的常量前缀拼接：CONST . 'lit' / CONST.CONST . 'lit' / 纯 CONST。
 
-    D-1 提取自 extract_includes 内联块（语义 1:1 保留）：逐 token 调 resolve_const 解析常量值，
-    路径段间用斜杠拼接（base.rstrip('/') + '/' + rb.lstrip('/')），最后做绝对/相对归一。
-    返回相对 root 的 rel 字符串；常量未定义/循环/含变量 → None（交由调用方落字面量兜底）。
-    注意：不使用 _resolve_const_rhs（其路径段拼接不加斜杠，对多常量链会丢失分隔符）。
+    逐 token 调 resolve_const 解析常量值，路径段斜杠拼接 + 绝对/相对归一；返回相对 root 的 rel。
+    常量未定义/循环/含变量 → None（交由调用方落字面量兜底）。
     """
     lit = lit or ''
     base = ''
@@ -139,14 +124,14 @@ def _resolve_const_include(head, lit, rel, const_table, root):
 
 
 def strip_php_comments(text):
-    """B2：抽取 include 前剥离 PHP 注释，避免 `// include('x')` 这类注释/死代码被当真边。
+    """B2：抽取 include 前剥离 PHP 注释，避免 `// include('x')` 类注释/死代码被当真边。
 
-    启发式（纯静态，非解析器）：先去块状 `/* ... */`，再按行处理行注释 `//`/`#`——
-    仅当行注释符前为行首空白或语句结束符(`;`/`}`/`{`/`)`)时才视为注释，降低误伤
-    字符串内 `http://`、`"#"` 等同行合法 require 的概率。已知局限：字符串内注释符仍可能误剥。
+    启发式（非解析器）：先等量换行去块注释，再按行处理 `//`/`#`——仅当注释符前为行首空白或
+    语句结束符(`;`/`}`/`{`/`)`)才视为注释，降低误伤字符串内 `http://` 的概率。
+    已知局限：字符串内注释符仍可能误剥。
     """
-    # 1) 去块注释
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    # 1) 去块注释：用等量换行替换（保行数），避免后续真实符号 loc 行号上移（可选4 修正）
+    text = re.sub(r"/\*.*?\*/", lambda _m: '\n' * _m.group(0).count('\n'), text, flags=re.S)
     out = []
     for line in text.split('\n'):
         # 找行注释起点：遍历字符，遇未闭合引号内的 // # 跳过
@@ -185,15 +170,11 @@ def strip_php_comments(text):
 
 
 def extract_includes(text, rel, root, const_table=None):
-    """提取 include/require 目标。
+    """提取 include/require 目标（覆盖帝国/易优/迅睿/ThinkPHP 等 CMS）。
 
-    支持四类写法（覆盖国内帝国/易优/迅睿/ThinkPHP 等 CMS 与框架）：
-      1) 字面量 / ./ ../ 相对路径
-      2) __DIR__ / dirname(__FILE__) 拼接
-      3) define() 常量前缀拼接：CONST 或 CONST . 'lit'（递归解析常量 RHS）
-      4) 变量拼路径（$base . '/x'）→ 动态，抽不出，跳过（规划漏抽边界）
-    常量被引用但无法静态解析（未定义/循环/含变量）→ 跳过，避免误边。
-    B2：PHP 文件抽取前先剥离注释，避免注释/死代码里的 include 被当成真实依赖边。
+    支持：字面量/相对路径、__DIR__/dirname 拼接、define() 常量链（递归解 RHS）、变量拼路径（动态抽不出跳过）。
+    常量无法静态解析（未定义/循环/含变量）→ 落字面量兜底，不跳过（避免误边）。
+    B2：PHP 文件抽取前先剥离注释（见 strip_php_comments）。
     """
     text = strip_php_comments(text)
     const_table = const_table or {}
@@ -208,11 +189,8 @@ def extract_includes(text, rel, root, const_table=None):
                 target = os.path.normpath(os.path.join(os.path.dirname(rel), raw.lstrip('/')))
                 includes.append(target)
             continue
-        # 2) define() 常量前缀拼接：CONST . 'lit' / CONST.CONST . 'lit' 链 / 纯 CONST
-        # D-1 去重：原内联常量链拼接块较长且易与 resolve_const 混淆，现提取为独立函数
-        # _resolve_const_include（语义 1:1 保留：逐 token 调 resolve_const + 路径段斜杠拼接 +
-        # 绝对/相对归一）。注意刻意不复用 _resolve_const_rhs：后者路径段拼接不加斜杠，
-        # 对多常量链（A.B）会产生 e/asubx.php 错误路径，故 require 表达式解析独立维护。
+        # 2) define() 常量前缀拼接：CONST . 'lit' / 链 / 纯 CONST（_resolve_const_include 提取，语义 1:1 保留）。
+        # 刻意不复用 _resolve_const_rhs：其路径段拼接不加斜杠，多常量链(A.B)会生成 e/asubx.php 错误路径。
         cm = re.match(
             r"^((?:[A-Z_][A-Z0-9_]*)(?:\s*\.\s*[A-Z_][A-Z0-9_]*)*)"
             r"\s*\.\s*['\"]([^'\"]*)['\"]$", expr) or \
@@ -267,11 +245,10 @@ def _safe_mtime(path):
 
 
 def detect_lsp(root):
-    """规划 §5.1 运行时 LSP 探测（仅记录可用性，v1 抽取仍走正则）。"""
+    """运行时 LSP 探测（仅记录可用性，v1 抽取仍走正则）。"""
     import shutil
     avail = {}
-    # D-2：统一用 shutil.which 探测，移除跨平台脆弱的 os.system('npm ls -g ... >nul') 同步阻塞调用。
-    # 全局 npm 装的 intelephense 不在 PATH 时 which 找不到 → False（仅可用性记录，抽取仍走正则，无功能影响）。
+    # D-2：统一用 shutil.which 探测（移除跨平台脆弱的 os.system 同步阻塞）；未命中 → False（仅可用性记录）。
     try:
         avail['php'] = bool(shutil.which('intelephense') or shutil.which('phpactor'))
     except Exception:
@@ -387,9 +364,7 @@ def parse_composer(root):
     al = data.get('autoload', {})
     for kind, key in (('psr4', 'psr-4'), ('psr0', 'psr-0')):
         for pref, d in (al.get(key) or {}).items():
-            pref = pref.rstrip('/').rstrip('\\')  # A-1：剥离 PSR-4/PSR-0 前缀尾部反斜杠，使 fqn_to_file 的 pref+'\\' 拼接正确命中
-            # PSR-4/PSR-0 标准前缀尾部反斜杠（如 "App\\": "app/"）须剥离，
-            # 否则 fqn_to_file 的 pref+'\\' 拼接会多一个反斜杠导致 startswith 永 False（A-1）
+            pref = pref.rstrip('/').rstrip('\\')  # A-1：剥尾部反斜杠，否则 fqn_to_file 的 pref+'\\' 拼接多一反斜杠致 startswith 永 False
             if isinstance(d, list):
                 for x in d:
                     out[kind][pref] = x.rstrip('/').rstrip('\\')
@@ -428,10 +403,8 @@ def fqn_to_file(fqn, composer, root):
 
 
 def resolve_module(spec, lang, rel, root):
-    """按语言把 import 模块说明符解析为项目内文件 rel（或 None）。
-
-    覆盖：Python import/from、JS CommonJS require + ESM import、Java import。
-    相对路径(. / ..)优先相对源文件；裸说明符回退 node_modules / 包根启发式。
+    """按语言把 import 说明符解析为项目内文件 rel（或 None）：Python/JS(ts)/Java。
+    相对路径优先相对源文件；裸说明符回退 node_modules / 包根启发式。
     """
     spec = spec.strip()
     if not spec:
@@ -506,8 +479,7 @@ def resolve_tp_import(spec, root, const_table):
       Com.*     -> EXTEND_PATH/Library/Com/*  (保留 Com 段，后缀 .class.php)
       Vendor.*  -> VENDOR_PATH/*              (去 Vendor 前缀；vendor() 调用已补 Vendor.)
       @.*       -> APP_PATH/*                 (去 @ 前缀，后缀 .class.php)
-      其它(项目类库,如 Common.Tool/MyApp.Action.User) -> APP_PATH/* 完整点路径
-        (.class.php 优先，缺失回退 .php，覆盖 import('X', APP_PATH, '.php') 形态)
+      其它(项目类库,如 Common.Tool/MyApp.Action.User) -> APP_PATH/* 完整点路径（.class.php 优先，缺失回退 .php）
     别名导入(单段无点,如 import('rbac')) 需 alias.php 映射,静态难穷举,留口 None。
     """
     spec = spec.strip()
@@ -562,46 +534,54 @@ def extract_file(path, root, const_table=None):
         return {'includes': [], 'classes': [], 'calls': [], 'namespace': None,
                 'uses': [], 'tpl_includes': []}
     rel = os.path.relpath(path, root).replace(os.sep, '/')
-    # include/require 是 PHP 专属语法（include(_once)/require(_once)）；其余语言（JS/TS/Java/Py/CSS/HTML）
-    # 走各自的模块导入机制，禁止用 PHP 正则误抽，否则 JS 中 `src:`/`require()` 等会被当成 include 噪声边。
+    # include/require 是 PHP 专属语法；其余语言走各自模块导入机制，禁止用 PHP 正则误抽（否则 JS `src:` 等成噪声边）。
     PHP_EXTS = ('.php', '.inc', '.phtml', '.php3', '.php4', '.php5')
+    # B-?：符号抽取须在剥离 PHP 注释后进行（避免注释/死代码里的 `// class X` 被当真实符号生成假边）。
+    # extract_includes 内部已自剥离；此处对非 include 的符号层统一前置剥离（仅 PHP 文件，非 PHP 仍用原文）。
+    code = strip_php_comments(text) if rel.endswith(PHP_EXTS) else text
     includes = extract_includes(text, rel, root, const_table) if rel.endswith(PHP_EXTS) else []
-    # 命名空间：取第一个文件级 namespace（复合文件取首个）
-    ns_m = RE_NAMESPACE.search(text)
-    namespace = ns_m.group(1) if ns_m else None
-    # use 导入
-    uses = [{'fqn': m.group(1), 'alias': m.group(2)} for m in RE_USE.finditer(text)]
-    classes = []
-    for m in RE_CLASS[0].finditer(text):
-        cls = m.group(1)
-        ext = m.group(2)
-        impl = m.group(3)
-        classes.append({'name': cls, 'line': text[:m.start()].count('\n') + 1,
-                        'extends': ext, 'implements': impl})
-    funcs = []
-    for m in RE_CLASS[1].finditer(text):
-        funcs.append(m.group(1))
-    # calls：new X() / X->method() / X::const（跨文件才记，规划 §4 敏感边约束）
-    calls = []
-    for m in re.finditer(r"new\s+(\w+)\s*\(", text):
-        calls.append(m.group(1))
-    for m in re.finditer(r"(\w+)->\w+\s*\(", text):
-        calls.append(m.group(1))
-    for m in re.finditer(r"(\w+)::\w+", text):
-        calls.append(m.group(1))
-    # 模板 include 标签（帝国/Dede/Discuz/易优 模板依赖）
+    # PHP 专属符号抽取（namespace/use/class/function/calls/new/::/FQN/tpimport）仅对 PHP 运行；
+    # 非 PHP 文件这些字段置空，禁止 .py/.js/.ts/.java 被 PHP 正则误抽污染符号表（ERR-006 同族）。
+    if rel.endswith(PHP_EXTS):
+        ns_m = RE_NAMESPACE.search(code)
+        namespace = ns_m.group(1) if ns_m else None
+        uses = [{'fqn': m.group(1), 'alias': m.group(2)} for m in RE_USE.finditer(code)]
+        classes = []
+        for m in RE_CLASS[0].finditer(code):
+            cls = m.group(1)
+            ext = m.group(2)
+            impl = m.group(3)
+            classes.append({'name': cls, 'line': code[:m.start()].count('\n') + 1,
+                            'extends': ext, 'implements': impl})
+        funcs = []
+        for m in RE_CLASS[1].finditer(code):
+            funcs.append(m.group(1))
+        # calls：new X() / X->method() / X::const（跨文件才记，规划 §4 敏感边约束）
+        calls = []
+        for m in re.finditer(r"new\s+(\w+)\s*\(", code):
+            calls.append(m.group(1))
+        for m in re.finditer(r"(\w+)->\w+\s*\(", code):
+            calls.append(m.group(1))
+        for m in re.finditer(r"(\w+)::\w+", code):
+            calls.append(m.group(1))
+        # new \Ns\Class（框架类实例化，composer 自动加载）
+        new_fqns = [m.group(1) for m in RE_NEW_FQN.finditer(code)]
+        # ThinkPHP 显式类库导入 import()/vendor()/Loader::import()（TP3/TP5 官方机制）
+        tp_imports = [(m.group(1), m.group(2)) for m in RE_TP_IMPORT.finditer(code)]
+    else:
+        namespace = None
+        uses = []
+        classes = []
+        funcs = []
+        calls = []
+        new_fqns = []
+        tp_imports = []
+    # 模板 include 标签（帝国/Dede/Discuz/易优 模板依赖；CMS 模板标签非 PHP 语法，保留原扫描 text）
     tpl_includes = []
     for m in RE_TPL_INCLUDE.finditer(text):
         tpl_includes.append(m.group(1))
     for m in RE_TPL_REQUIRE.finditer(text):
         tpl_includes.append(m.group(1))
-    # new \Ns\Class（框架类实例化，composer 自动加载）
-    new_fqns = [m.group(1) for m in RE_NEW_FQN.finditer(text)]
-    # ThinkPHP 显式类库导入 import()/vendor()/Loader::import()（TP3/TP5 官方机制）
-    tp_imports = []
-    if rel.endswith('.php'):
-        for m in RE_TP_IMPORT.finditer(text):
-            tp_imports.append((m.group(1), m.group(2)))
     # 非 PHP 语言模块导入（Django/Flask/Spring/React/Vue/...）
     lang = None
     if rel.endswith('.py'):
@@ -779,14 +759,13 @@ def build(root):
             trel = os.path.normpath(os.path.join(os.path.dirname(rel), a))
             add_edge_if_exists(rel, trel.replace(os.sep, '/'), 'asset')
         for call in ex['calls']:
-            if call in symbols or call in ('Db', 'Model', 'User', 'ApiHandler'):
-                # 跨文件调用边（仅当目标在别处定义）
-                if call in symbols and symbols[call]['file'] != rel:
-                    key = (rel, symbols[call]['file'], 'calls')
-                    if key not in edge_keys:
-                        edge_keys.add(key)
-                        edges.append({'from': rel, 'to': symbols[call]['file'],
-                                      'kind': 'calls', 'symbol': call})
+            # 跨文件调用边（仅当目标符号在别处定义）
+            if call in symbols and symbols[call]['file'] != rel:
+                key = (rel, symbols[call]['file'], 'calls')
+                if key not in edge_keys:
+                    edge_keys.add(key)
+                    edges.append({'from': rel, 'to': symbols[call]['file'],
+                                  'kind': 'calls', 'symbol': call})
 
     # 孤儿检测（规划 §5.6② 仅告警不裁决）
     for name, loc in symbols.items():
@@ -849,8 +828,13 @@ def _write_markdown(path, graph, root):
         f.write('\n'.join(lines))
 
 
-def query(graph, meta, symbols, root, q, direction='both', depth=2):
-    """规划 §9 查询接口 + 环检测。返回裁剪子图。"""
+def query(graph, meta, symbols, root, q, direction='both', depth=2, all_cycles=False):
+    """§9 查询接口 + 环检测，返回裁剪子图。
+
+    all_cycles: False=仅检测 direction 可达闭包内的环（与「只警告已遍历子图」一致，
+    down=依赖闭包/up=被依赖闭包互不越界）；True=对全图做有向 DFS 环检测，任意查询全局预警循环依赖
+    （--direction down 也能报依赖间环）。默认行为不变，E2E-8 不破坏。
+    """
     # 解析入口
     entry = None
     if q in graph['nodes']:
@@ -867,28 +851,84 @@ def query(graph, meta, symbols, root, q, direction='both', depth=2):
         print(f"[GRAPH-QUERY] 符号索引缺失：{q}（返回空子图，未做全图扫描）")
         return {'nodes': {}, 'edges': [], 'cycle': 0}
 
-    # 构建邻接（按 direction）+ 原边 kind 映射
+    # 构建邻接（按 direction）+ 平行边 kind 聚合（同 from→to 多种 kind 全保留），(from,to) 去重防重复遍历。
     adj = {'up': {}, 'down': {}}
-    edge_kind_map = {}
+    edge_kind_map = {}  # (from,to) -> 该有向边的全部 kind 列表（平行边聚合）
+    seen_pair = set()
     for e in graph['edges']:
-        adj['down'].setdefault(e['from'], []).append(e['to'])
-        adj['up'].setdefault(e['to'], []).append(e['from'])
-        edge_kind_map[(e['from'], e['to'])] = e['kind']
+        key = (e['from'], e['to'])
+        if key not in seen_pair:
+            seen_pair.add(key)
+            if e['to'] not in adj['down'].setdefault(e['from'], []):
+                adj['down'][e['from']].append(e['to'])
+            if e['from'] not in adj['up'].setdefault(e['to'], []):
+                adj['up'][e['to']].append(e['from'])
+        edge_kind_map.setdefault(key, [])
+        if e['kind'] not in edge_kind_map[key]:
+            edge_kind_map[key].append(e['kind'])
 
     MAX_NODES = 80  # 节点预算硬上限（规划 §9 省 token：防枢纽模块 2 跳爆炸）
-    visited = set()
+    visited = set()    # 全局去重：该节点已纳入子图（不论是否在当前递归路径）
+    stack = set()      # 当前递归路径（仅用于真环判定的回边检测）
     subgraph_nodes = {}
     subgraph_edges = []
     cycles = [0]
     seen_cycle = set()  # 环边按 (from,to) 去重，仅保留一条（规划 §9「环只保留一条边」）
+    # 环检测：在「有向(down)图」独立 DFS 回边计数，与查询方向解耦，保证守恒②③①：
+    # ② 回边须沿 authored 方向(down)闭合，禁止 both/up 反向命中祖先的伪回边（菱形 DAG 假阳性）；
+    # ① 自环 A→A 在有向 DFS 中只计 1 次（旧 both 模式 up/down 邻接各含 A 会计 2）。
+    # 范围=direction 可达闭包（非仅 entry 的 down 集），否则 up/both 漏检 entry 纯上游环。
+    def _reachable(entry, direction):
+        dirs = []
+        if direction in ('up', 'both'):
+            dirs.append('up')
+        if direction in ('down', 'both'):
+            dirs.append('down')
+        seen = {entry}
+        stack = [entry]
+        while stack:
+            u = stack.pop()
+            for dr in dirs:
+                for v in adj[dr].get(u, []):
+                    if v not in seen:
+                        seen.add(v)
+                        stack.append(v)
+        return seen
 
-    def walk(node, d):
+    def detect_cycles(starts, allowed):
+        vis = set(); st = set(); pairs = []
+        def dfs(u):
+            vis.add(u); st.add(u)
+            for v in adj['down'].get(u, []):
+                if v not in allowed:      # 不走出查询遍历范围，避免把范围外下游环算进来
+                    continue
+                if v in st:
+                    pairs.append((u, v))   # u→v 沿 authored 方向闭合环
+                elif v not in vis:
+                    dfs(v)
+            st.discard(u)
+        for s in starts:
+            if s not in vis:
+                dfs(s)
+        return pairs
+    # 全局环检测模式：起点/范围=全图节点（不受 direction 闭包限制）；默认模式=遍历闭包
+    if all_cycles:
+        cyc_scope = set(graph['nodes'])
+    else:
+        cyc_scope = _reachable(entry, direction)
+    cyc_pairs = detect_cycles(cyc_scope, cyc_scope)
+    cyc_set = set(cyc_pairs)
+    cycles[0] = len(cyc_pairs)
+
+    def walk(node, d, came_from=None, came_dir=None):
         if node in visited:
             return
         visited.add(node)
+        stack.add(node)
         if node in graph['nodes']:
             subgraph_nodes[node] = graph['nodes'][node]
         if d >= depth or len(subgraph_nodes) >= MAX_NODES:
+            stack.discard(node)
             return
         dirs = []
         if direction in ('up', 'both'):
@@ -899,9 +939,13 @@ def query(graph, meta, symbols, root, q, direction='both', depth=2):
             for nxt in adj[dr].get(node, []):
                 if len(subgraph_nodes) >= MAX_NODES:
                     return
-                # 遇已访问（环）→ 折叠标记，不展开（环边去重，仅保留一条）
-                if nxt in visited:
-                    cycles[0] += 1
+                # both 模式"刚走过的同一条边的逆向遍历"是伪环（A→B 再 up 回 A）；
+                # 仅 nxt==came_from 且 dr!=came_dir 才跳过。真 2 节点互环两向相同(dr==came_dir)，不算伪环。
+                if nxt == came_from and dr != came_dir:
+                    continue
+                # 仅「有向图 DFS 真回边」(node,nxt)∈cyc_set 且在当前路径上才算环；
+                # 菱形/重复边目标节点虽 visited 但非 stack 上的 down 回边→不计。
+                if nxt in stack and dr == 'down' and (node, nxt) in cyc_set:
                     # 环边引用的祖先节点可能不在子图节点集，补入避免人类兜底 graph.md 引用缺失（B-2）
                     if nxt in graph['nodes']:
                         subgraph_nodes.setdefault(nxt, graph['nodes'][nxt])
@@ -910,10 +954,13 @@ def query(graph, meta, symbols, root, q, direction='both', depth=2):
                         subgraph_edges.append({'from': node, 'to': nxt,
                                                'kind': 'cycle'})
                     continue
-                kind = edge_kind_map.get((node, nxt)) or edge_kind_map.get(
-                    (nxt, node)) or 'include'
-                subgraph_edges.append({'from': node, 'to': nxt, 'kind': kind})
-                walk(nxt, d + 1)
+                # 平行边：取 (node,nxt) 或 (nxt,node) 的全部 kind，逐条产出（不覆盖）
+                kinds = edge_kind_map.get((node, nxt)) or edge_kind_map.get(
+                    (nxt, node)) or ['include']
+                for k in kinds:
+                    subgraph_edges.append({'from': node, 'to': nxt, 'kind': k})
+                walk(nxt, d + 1, came_from=node, came_dir=dr)
+        stack.discard(node)
 
     walk(entry, 0)
     if cycles[0]:
@@ -939,7 +986,7 @@ def need_rebuild(root):
     except Exception:
         return True, 0
     changed = 0
-    current_rels = set()  # B3：记录当前仍存在源文件，用于检测"删除"
+    current_rels = set()  # B3：记录现存源文件，检测"删除"
     mtimes = meta.get('file_mtimes', {})  # 廉价 mtime 前置过滤：mtime 未变则内容必未变
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS
@@ -949,16 +996,16 @@ def need_rebuild(root):
                 p = os.path.join(dirpath, fn)
                 rel = os.path.relpath(p, root).replace(os.sep, '/')
                 current_rels.add(rel)
-                # mtime 一致（含旧版无 file_mtimes 时 mtimes={} → 不触发，回退全量 md5）
+                # mtime 一致（旧版无 file_mtimes 时 mtimes={} → 回退全量 md5）
                 if rel in mtimes and mtimes[rel] == _safe_mtime(p):
                     continue
                 h = file_hash(p)
                 if rel not in meta.get('file_hashes', {}) or meta['file_hashes'][rel] != h:
                     changed += 1
-    # B3：meta 记录的文件若已不在当前树中（被删除）→ 视为变更，触发重建，避免残留悬空边
+    # B3：meta 记录的文件已不在当前树（被删）→ 触发重建，避免残留悬空边
     if set(meta.get('file_hashes', {})) - current_rels:
         changed += 1
-    # 脚本版本校验（规划：脚本升级应触发重建）
+    # 脚本版本校验：升级应触发重建
     if meta.get('script_hash') != file_hash(os.path.abspath(__file__)):
         changed += 1
     return changed > 0, changed
@@ -973,6 +1020,8 @@ def main():
     ap.add_argument('--rebuild', action='store_true', help='强制全量重建')
     ap.add_argument('--no-rebuild', action='store_true',
                     help='跳过新鲜度检测，直接复用已缓存图谱（仅在确认图谱新鲜的连续查询时使用）')
+    ap.add_argument('--all-cycles', action='store_true',
+                    help='全局环检测：对任意查询都全图 DFS 预警循环依赖（不受 --direction 闭包限制），默认关')
 
     ap.add_argument('--selftest', action='store_true',
                     help='运行内置 E2E 自检（删文件无悬挂边 + 改文件过期判定），不改交付物')
@@ -992,13 +1041,138 @@ def main():
                     json.load(open(os.path.join(kg, 'symbols.json'), encoding='utf-8')))
         build(work)
         g, m, s = load()
+        # E2E-5: 注释伪符号回归（build_graph 注释缺陷防护，ERR-006）。
+        # 构造最小 PHP fixture：真实符号 + 注释/死代码中的伪符号，build 后断言
+        # symbols.json 不含伪符号、edges 不含指向伪符号的假 extends/calls 边。
+        # 须置于 victim 早返回（非 include 项目会早退）之前，确保任何项目均跑此断言。
+        fx_dir = os.path.join(work, '__kg_phantom_fixture__')
+        os.makedirs(fx_dir, exist_ok=True)
+        fx = os.path.join(fx_dir, 'phantom.php')
+        with open(fx, 'w', encoding='utf-8') as _f:
+            _f.write(
+                "<?php\n"
+                "// class KgTestPhantomCls extends RealClass\n"   # 行注释伪类
+                "// KgTestPhantomHelper::go();\n"                 # 行注释伪静态调用
+                "/* class KgTestPhantomDead {} */\n"              # 块注释伪类
+                "class RealClass {}\n"                        # 真实类
+                "function realFunc() {}\n"                    # 真实函数
+                "$o = new RealClass();\n"                     # 真实实例化
+                "RealClass::const();\n"                       # 真实静态调用
+            )
+        build(work)
+        g5, _, s5 = load()
+        phantom_names = ('KgTestPhantomCls', 'KgTestPhantomDead', 'KgTestPhantomHelper')
+        # 仅断言 fixture 文件自身的 symbols：build() 会扫描 build_graph.py 自身，
+        # 其源码内嵌的 fixture 字符串字面量里 `class Xxx` 会被 RE_CLASS 误抽，
+        # 故须按文件归属过滤，避免自扫描导致的假阳性（非代码缺陷）。
+        fx_rel = '__kg_phantom_fixture__/phantom.php'
+        fx_syms = [n for n, loc in s5.items()
+                   if isinstance(loc, dict) and loc.get('file') == fx_rel]
+        phantom_syms = [n for n in phantom_names if n in fx_syms]
+        print('[E2E-5] 伪符号命中:', phantom_syms, '(期望 [])')
+        assert not phantom_syms, '[E2E-5] 注释伪符号未过滤: %s' % phantom_syms
+        # 真实符号须保留（避免 strip 误伤正常代码）。须断言 fixture 文件自身 fx_syms 而非全局 s5：
+        # build() 会扫描自身（.py），其内嵌 fixture 字符串里的 `class RealClass` 曾被 RE_CLASS 误抽进 s5 兜底，
+        # 用全局 s5 会使本断言"假通过"——即使 fixture 真实符号被误剥，s5 仍有同名符号。
+        assert 'RealClass' in fx_syms, '[E2E-5] fixture 真实符号 RealClass 被误剥（fx_syms 缺失）'
+        # edges 不得含指向伪符号的 symbol（extends/calls/autoload 均经 symbols 命中，伪符号不在表中则无假边）
+        phantom_edges = [e for e in g5['edges']
+                         if e.get('symbol') in phantom_names]
+        print('[E2E-5] 指向伪符号的假边:', len(phantom_edges), '(期望 0)')
+        assert not phantom_edges, '[E2E-5] 存在指向注释伪符号的假边'
+        print('[E2E-5] 通过：注释伪符号已过滤，真实符号保留')
+        # E2E-6: strip_php_comments 须保留换行（ERR-006 同族），否则真实符号行号上移、改动定位失真。
+        _s6_in = (
+            "<?php\n"
+            "class A {}\n"        # line 2
+            "/* multi\n"          # line 3
+            "   line comment\n"    # line 4
+            "*/\n"                # line 5
+            "class B {}\n"        # line 6（strip 后仍须在第 6 行）
+        )
+        _s6_out = strip_php_comments(_s6_in)
+        _s6_nl_in = _s6_in.count('\n')
+        _s6_nl_out = _s6_out.count('\n')
+        print('[E2E-6] 换行数 输入/输出:', _s6_nl_in, '/', _s6_nl_out, '(期望相等)')
+        assert _s6_nl_out == _s6_nl_in, \
+            '[E2E-6] 块注释删除内部换行致行号位移：去 %d 行' % (_s6_nl_in - _s6_nl_out)
+        assert 'class B' in _s6_out, '[E2E-6] 真实符号 B 被块注释误吞'
+        print('[E2E-6] 通过：块注释内部换行已保留，行号不位移')
+        # E2E-7: 符号抽取语言隔离（issue-2）。非 PHP 文件不得被 PHP 正则误抽；PHP 文件仍须正常抽取。
+        _py_f = os.path.join(work, '__kg_lang_iso__.py')
+        with open(_py_f, 'w', encoding='utf-8') as _f:
+            _f.write("class FakeCls:\n    x = new RealCls()\n")
+        _js_f = os.path.join(work, '__kg_lang_iso__.js')
+        with open(_js_f, 'w', encoding='utf-8') as _f:
+            _f.write("class KgTestPhantomCls { go() { this.helper() } }\n")
+        _php_f = os.path.join(work, '__kg_lang_iso__.php')
+        with open(_php_f, 'w', encoding='utf-8') as _f:
+            _f.write("<?php\nclass RealPhpCls {}\n")
+        _ex_py = extract_file(_py_f, work)
+        _ex_js = extract_file(_js_f, work)
+        _ex_php = extract_file(_php_f, work)
+        _py_classes = [c['name'] for c in _ex_py['classes']]
+        _js_classes = [c['name'] for c in _ex_js['classes']]
+        print('[E2E-7] .py 误抽 class:', _py_classes, '(期望 [])')
+        print('[E2E-7] .js 误抽 class:', _js_classes, '(期望 [])')
+        assert not _py_classes, '[E2E-7] .py 被误抽 PHP 符号: %s' % _py_classes
+        assert not _js_classes, '[E2E-7] .js 被误抽 PHP 符号: %s' % _js_classes
+        # PHP 抽取未被连带禁用（回归：非 PHP 门禁不能误伤 PHP）
+        _php_classes = [c['name'] for c in _ex_php['classes']]
+        assert 'RealPhpCls' in _php_classes, \
+            '[E2E-7] PHP 真实类未被抽取（门禁误伤）: %s' % _php_classes
+        print('[E2E-7] 通过：非 PHP 零误抽，PHP 抽取保留')
+        # E2E-8: 环检测三守恒回归（历史犯错最多，karpathy 守恒 + ERR-004）：
+        # ① 计数不重不漏 ② 遍历方向与边有向性一致 ③ 平行边不翻倍。
+        # 直接构造图 dict 调 query()（免建文件），覆盖 7 例（菱形DAG/3环/互环2/自环/平行边/3环(up)/上游环(up)）。
+        def _mk_g(nodes, edges):
+            return {'nodes': {n: {} for n in nodes},
+                    'edges': [{'from': a, 'to': b, 'kind': 'include'} for a, b in edges]}
+        _cyc_cases = [
+            # (name, nodes, edges, direction, expect_cycle)  — 期望见 karpathy 守恒
+            ('菱形DAG(both)', ['A', 'B', 'C', 'D'],
+             [('A', 'B'), ('A', 'C'), ('B', 'D'), ('C', 'D')], 'both', 0),   # 守恒②：反向遍历命中祖先不得算环
+            ('真实3环(both)', ['A', 'B', 'C'],
+             [('A', 'B'), ('B', 'C'), ('C', 'A')], 'both', 1),                # 守恒①②
+            ('互环2(both)', ['A', 'B'],
+             [('A', 'B'), ('B', 'A')], 'both', 1),                            # 守恒①②
+            ('自环(both)', ['A'], [('A', 'A')], 'both', 1),                   # 守恒①：旧实现计 2，须 1
+            ('平行边(both)', ['A', 'B'],
+             [('A', 'B'), ('A', 'B')], 'both', 0),                            # 守恒③：平行边不翻倍
+            ('真实3环(up)', ['A', 'B', 'C'],
+             [('A', 'B'), ('B', 'C'), ('C', 'A')], 'up', 1),                  # 守恒②：up 模式仍须检出真环
+            ('上游环(up)', ['X', 'Y', 'Z'],
+             [('Y', 'X'), ('Y', 'Z'), ('Z', 'Y')], 'up', 1),                  # 守恒②：entry 纯上游 Y↔Z 环须检出（entry 不在环上）
+        ]
+        for _cn, _nd, _ed, _dir, _exp in _cyc_cases:
+            _gr = _mk_g(_nd, _ed)
+            _r = query(_gr, {}, {}, work, _nd[0], direction=_dir, depth=5)
+            print('[E2E-8] %s 环数: %s (期望 %s)' % (_cn, _r['cycle'], _exp))
+            assert _r['cycle'] == _exp, \
+                '[E2E-8] %s 环数=%s 期望 %s（守恒违反）' % (_cn, _r['cycle'], _exp)
+        print('[E2E-8] 通过：环检测三守恒（不重不漏/方向一致/平行边不翻倍）均满足')
+        # E2E-9: 全局环检测开关（改进项1）。图 A↔B 成环、A→X（X 下游汇点）；
+        # entry=X --direction down 默认只遍历闭包 {X} → 0 环；--all-cycles 全图 DFS → 命中 A↔B → 1 环。
+        _g9 = _mk_g(['A', 'B', 'X'], [('A', 'B'), ('B', 'A'), ('A', 'X')])
+        _r9_def = query(_g9, {}, {}, work, 'X', direction='down', depth=5, all_cycles=False)
+        print('[E2E-9] 默认(down,entry=X) 环数: %s (期望 0)' % _r9_def['cycle'])
+        assert _r9_def['cycle'] == 0, '[E2E-9] 默认模式误报闭包外环: %s' % _r9_def['cycle']
+        _r9_all = query(_g9, {}, {}, work, 'X', direction='down', depth=5, all_cycles=True)
+        print('[E2E-9] 全局(--all-cycles,down,entry=X) 环数: %s (期望 1)' % _r9_all['cycle'])
+        assert _r9_all['cycle'] == 1, '[E2E-9] 全局模式漏报全图环: %s' % _r9_all['cycle']
+        print('[E2E-9] 通过：全局环检测开关生效且不破坏默认闭包行为')
         # E2E-3: 选一个被依赖的真实源文件，删之，重建后其依赖边应不残留（悬空已剔除）
         victim = None
         for e in g['edges']:
             if e['kind'] == 'include' and os.path.exists(os.path.join(work, e['to'])):
                 victim = e['to']
                 break
-        assert victim, 'E2E-3: 无可用 victim'
+        if not victim:
+            # 非 PHP/JS include 项目（纯 import/use、空图谱等）无可用 victim，
+            # 优雅跳过并清理临时副本，避免 AssertionError 崩溃 + 残留目录。
+            _shutil.rmtree(work)
+            print('[SELFTEST] 跳过 E2E-3/4：当前目录图谱无 include 边（非 PHP/JS include 项目），无法构造 victim（副本已清理）')
+            return
         dependents = [e['from'] for e in g['edges'] if e['to'] == victim]
         print('[E2E-3] 依赖', victim, '的文件数:', len(dependents))
         bak = os.path.join(work, victim) + '.baktest'
@@ -1048,7 +1222,8 @@ def main():
             q = q.strip()
             if not q:
                 continue
-            sub = query(graph, meta, symbols, root, q, args.direction, args.depth)
+            sub = query(graph, meta, symbols, root, q, args.direction, args.depth,
+                        args.all_cycles)
             merged['nodes'].update(sub['nodes'])
             merged['edges'].extend(sub['edges'])
             merged['cycle'] += sub['cycle']

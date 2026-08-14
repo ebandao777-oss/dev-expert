@@ -1,4 +1,4 @@
-# MySQL数据库 -- 数据建模、SQL安全与性能优化
+﻿# MySQL数据库 -- 数据建模、SQL安全与性能优化
 
 面向 PHP/CMS/网站项目中的 MySQL 数据库设计、SQL 编写、索引优化、慢查询诊断、迁移回滚和数据安全场景。目标是在写代码前先明确表结构、访问路径、事务边界和验证方法，避免后期靠补丁修数据库问题。
 
@@ -28,7 +28,7 @@
 先判断当前任务属于哪一类：
 
 | 类型 | 触发关键词 | 优先动作 |
-|------|------------|----------|
+| - | - | - |
 | 表结构设计 | 建表、字段、模型、Schema | 输出 DDL + 字段说明 + 索引 |
 | SQL 编写 | 查询、筛选、分页、统计 | 输出参数化 SQL + 绑定参数 |
 | 慢查询优化 | 慢、卡、超时、EXPLAIN | 先读执行计划，再改 SQL/索引 |
@@ -52,7 +52,7 @@ SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION';
 #### 基础规范
 
 | 项 | 规则 |
-|----|------|
+| - | - |
 | 引擎 | 默认 InnoDB；只有明确 CMS 历史约束时保留 MyISAM |
 | 主键 | `BIGINT UNSIGNED AUTO_INCREMENT` |
 | 字符集 | 表和字段统一 `utf8mb4` |
@@ -64,7 +64,7 @@ SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION';
 #### 字段类型选择
 
 | 场景 | 类型 |
-|------|------|
+| - | - |
 | 主键/外键 | `BIGINT UNSIGNED` |
 | 状态/枚举 | `TINYINT UNSIGNED` |
 | 金额 | `DECIMAL(12,2)` 或按业务精度调整 |
@@ -87,7 +87,7 @@ SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION';
 #### 基础规则
 
 | 规则 | 要求 |
-|------|------|
+| - | - |
 | 命名 | 普通索引 `idx_表名_字段`，唯一索引 `uk_表名_字段` |
 | 联合索引 | 遵循最左前缀，等值字段在前，范围/排序字段靠后 |
 | 数量 | 普通业务表不超过 5 个，大表不超过 8 个 |
@@ -127,7 +127,7 @@ KEY idx_orders_tenant_status_created (tenant_id, status, created_at)
 #### 查询场景策略
 
 | 场景 | 索引策略 | 禁忌 |
-|------|----------|------|
+| - | - | - |
 | 精确查询 | 唯一键或高区分度普通索引 | 给低区分度状态字段单独建索引 |
 | 列表分页 | 过滤字段 + 排序字段联合索引 | 大 offset 深分页 |
 | 深分页 | 使用游标/last_id 翻页 | `LIMIT 100000,20` |
@@ -162,7 +162,7 @@ KEY idx_article_cat_status_time_id (cat_id, status, publish_time, id)
 必须检查已有索引，避免重复：
 
 | 已有索引 | 新索引 | 判断 |
-|----------|--------|------|
+| - | - | - |
 | `(a,b)` | `(a)` | 通常冗余 |
 | `(a,b)` | `(a,b,c)` | 可能可合并，需看查询 |
 | `(a)` | `(b,a)` | 不等价 |
@@ -187,7 +187,7 @@ KEY idx_article_cat_status_time_id (cat_id, status, publish_time, id)
 #### CMS 常见索引策略
 
 | CMS 场景 | 推荐策略 |
-|----------|----------|
+| - | - |
 | 栏目内容列表 | `classid/status/newstime` 或项目等效字段联合索引 |
 | 后台搜索 | 关键词字段不做 `%kw%` 普通索引幻想，改全文索引或搜索服务 |
 | 订单/表单列表 | `site_id/status/created_at` 联合索引 |
@@ -197,7 +197,7 @@ KEY idx_article_cat_status_time_id (cat_id, status, publish_time, id)
 #### EXPLAIN 验收标准
 
 | 字段 | 目标 |
-|------|------|
+| - | - |
 | `type` | 至少达到 `range`，高频点查应为 `ref` / `const` |
 | `key` | 命中预期索引 |
 | `rows` | 扫描行数与业务结果数量同量级 |
@@ -210,7 +210,7 @@ KEY idx_article_cat_status_time_id (cat_id, status, publish_time, id)
 所有外部输入必须参数绑定，内部接口也不例外。
 
 | 场景 | 禁止 | 强制 |
-|------|------|------|
+| - | - | - |
 | WHERE | `"id=$id"` | `WHERE id = ?` |
 | LIKE | `LIKE "%$kw%"` | `LIKE CONCAT('%', ?, '%')` |
 | IN | 手动拼 `IN(1,2,3)` | 动态占位符 `IN(?,?,?)` |
@@ -238,7 +238,7 @@ KEY idx_article_cat_status_time_id (cat_id, status, publish_time, id)
 诊断重点：
 
 | EXPLAIN 字段 | 风险信号 |
-|--------------|----------|
+| - | - |
 | type | `ALL` / `index` 需警惕 |
 | rows | 扫描行数远大于返回行数 |
 | key | 未命中预期索引 |
@@ -332,7 +332,7 @@ DDL/数据修复必须输出：
 ## 失败回退机制
 
 | 步骤 | 失败场景 | 回退策略 | 重试次数 | 最终处理 |
-|------|----------|----------|----------|----------|
+| - | - | - | - | - |
 | 第一步：识别数据库任务类型 | 需求不清 | 按建表/查询/优化/迁移四类询问用户 | 1 | 输出假设并标注待确认 |
 | 第二步：确认版本、字符集和会话设置 | MySQL版本未知 | 默认 MySQL 8.0，兼容 5.7 写法 | 1 | 标注版本假设 |
 | 第三步：表结构设计 | 字段含义不足 | 输出最小字段集并列待确认字段 | 1 | 不生成破坏性 DDL |

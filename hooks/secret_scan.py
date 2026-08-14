@@ -12,7 +12,7 @@ import re
 
 # 拼接构造，源码中不出现完整敏感词
 CREDS = re.compile(
-    "(pass" + "word|pass" + "wd|pwd|api" + "_key|sec" + "ret|tok" + "en|access" + "_key|db" + "pass)"
+    "(pass" + "word|pass" + "_word|pass" + "wd|pwd|api" + "_key|sec" + "ret|tok" + "en|access" + "_key|db" + "pass|db" + "_pass)"
     r"\s*=\s*[\"'][^\"']{4,}[\"']"
 )
 LOG_FN = re.compile("(?:error" + "_log|sys" + "log|file" + "_put_contents)")

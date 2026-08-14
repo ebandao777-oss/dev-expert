@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""PreCompact hook (GLOBAL): 上下文压缩前写 ≤2KB 交接快照到 memory。
+"""PreCompact hook (GLOBAL): 上下文压缩前写 ≤2KB 交接快照到项目记忆根。
+
+落点：{PROJECT_ROOT}/.ai-memory/_handoff_snapshot.md
+（PROJECT_ROOT 按 project-memory-management「路径根目录探测协议」解析，绝
+不写死 .codebuddy 等其它 IDE 约定路径；记忆跟随项目，跨 IDE 通用。）
 
 hook 拿不到对话内容，故快照基于文件系统派生（压缩后最实用的重定位信息）：
-- 近 4 小时内被改动的项目文件（排除备份/依赖/缓存目录），按时间倒序取前 25
+- 近 4 小时内被改动的项目文件（排除备份/依赖/缓存/记忆目录），按时间倒序取前 25
 - 当前 Plan/*.md 的状态行（## 状态）
 - 最新一份每日 memory 文件名
-落点：<workspace>/.codebuddy/memory/_handoff_snapshot.md
-（workspace 取 hook 运行 cwd；全局 hook 不写死单一项目路径）
 """
 import sys
 import os
@@ -17,10 +19,41 @@ import time
 CUTOFF_HOURS = 4
 MAX_FILES = 25
 EXCLUDE = {"backup", "vendor", "node_modules", "uploads",
-           ".git", ".codebuddy", "ecachefiles",
+           ".git", ".codebuddy", ".ai-memory", "ecachefiles",
            "__pycache__", "dist", "build", "cache", "tmp", "temp", "logs", "runtime"}
 # 排除备份/临时文件扩展名（避免 backup_on_write 的 .bak/.bak.1/.bak.2 污染快照）
 EXCLUDE_EXT = {".bak", ".tmp", ".log", ".cache", ".pyc", ".swp", ".swo"}
+
+
+def _find_git_root(start):
+    """向上找最近的 .git 目录，返回其所在目录（仓库根），找不到返回 None。"""
+    d = os.path.abspath(start)
+    while True:
+        if os.path.isdir(os.path.join(d, ".git")):
+            return d
+        nd = os.path.dirname(d)
+        if nd == d:
+            return None
+        d = nd
+
+
+def resolve_project_root(root):
+    """按技能「路径根目录探测协议」解析 PROJECT_ROOT：
+
+    1. 环境变量 PROJECT_ROOT（跨 IDE 通用，优先）：绝对路径直接用，相对路径按 root 拼接。
+    2. Git 仓库根目录：向上找含 .git 的目录。
+    3. IDE 工作区根目录：仅当 cwd 自身已含 .ai-memory（确为项目记忆根）时才回退。
+    4. 以上均未命中：hook 无法询问用户，返回 None（由调用方跳过，严禁自行创建目录）。
+    """
+    env = os.environ.get("PROJECT_ROOT")
+    if env:
+        return env if os.path.isabs(env) else os.path.join(root, env)
+    git_root = _find_git_root(root)
+    if git_root:
+        return git_root
+    if os.path.isdir(os.path.join(root, ".ai-memory")):
+        return root
+    return None
 
 
 def main():
@@ -29,8 +62,13 @@ def main():
     except Exception:
         pass
 
-    root = os.getcwd()
-    mem_dir = os.path.join(root, ".codebuddy", "memory")
+    cwd = os.getcwd()
+    proj_root = resolve_project_root(cwd)
+    if not proj_root:
+        # 项目根不可解析（如运行在 skill 目录、或记忆在数据库的运行时不落文件系统）：跳过落盘
+        return 0
+    mem_dir = os.path.join(proj_root, ".ai-memory")
+    root = proj_root  # 所有扫描与相对路径均以解析出的项目根为基准
     cutoff = time.time() - CUTOFF_HOURS * 3600
 
     recent = []
@@ -102,8 +140,9 @@ def main():
             except OSError:
                 continue
         mds.sort(reverse=True)  # 按 mtime 降序，最新的在前
+        rel_mem = os.path.relpath(mem_dir, root).replace("\\", "/")
         if mds:
-            lines.append("- 最新: .codebuddy/memory/%s" % mds[0][1])
+            lines.append("- 最新: %s/%s" % (rel_mem, mds[0][1]))
         else:
             lines.append("- (无)")
     else:

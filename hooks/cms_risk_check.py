@@ -435,6 +435,19 @@ def main():
     except OSError:
         return 0
 
+    # 中间变量污点追踪：收集被赋值为用户输入的变量，用于跨行 LFI 检测
+    #   $page = $_GET['page']; include($page);
+    taint_assign_re = re.compile(
+        r"\$([A-Za-z_]\w*)\s*=\s*"
+        r"(?:\$_(?:GET|POST|REQUEST|COOKIE)\b"
+        r"|\$[A-Za-z_]\w*\s*\.\s*\$_(?:GET|POST|REQUEST|COOKIE)\b)",
+        re.IGNORECASE,
+    )
+    tainted_vars = set()
+    for line in lines:
+        for m in taint_assign_re.finditer(line):
+            tainted_vars.add(m.group(1))
+
     hits = []
     for i, line in enumerate(lines, 1):
         # 跳过注释行
@@ -451,6 +464,26 @@ def main():
         for pat in PATTERNS:
             if pat["regex"].search(line):
                 hits.append((i, pat["id"], pat["msg"], stripped[:120]))
+
+    # 中间变量 LFI：include/require 的参数是被用户输入赋值过的变量
+    if tainted_vars:
+        inter_include_re = re.compile(
+            r"(?:include|require|include_once|require_once)\s*\(?\s*"
+            r"\$(" + "|".join(re.escape(v) for v in sorted(tainted_vars, key=len, reverse=True)) + r")\b",
+            re.IGNORECASE,
+        )
+        for i, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if stripped.startswith("//") or stripped.startswith("#"):
+                continue
+            if stripped.startswith("/*") or stripped.startswith("*"):
+                continue
+            if SAFE_RE.search(line):
+                continue
+            if inter_include_re.search(line):
+                hits.append((i, "FILE_INCLUDE",
+                    "文件包含漏洞：include/require 使用被用户输入赋值过的中间变量，可能导致 LFI/RFI",
+                    stripped[:120]))
 
     if not hits:
         return 0

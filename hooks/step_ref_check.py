@@ -35,14 +35,14 @@ REF_RE = re.compile(
 # 匹配目标文件中的「### 第<N>步：」章节标题
 STEP_HEAD_RE = re.compile(r'^###\s*第([一二三四五六七八九十]+)步', re.MULTILINE)
 
-# 已知的 18 个子技能 reference 名（用于过滤误匹配）
+# 已知的 19 个子技能 reference 名（用于过滤误匹配；与 SKILL.md / README / FAQ 的"19 个子技能"口径一致）
 KNOWN_REFS = {
     "software-project", "website-project", "api-design", "bug-diagnosis",
     "karpathy-coding-guidelines", "spec-driven-development", "code-review",
     "code-generation", "task-decomposition-and-execution", "tech-selection",
     "doc-generation", "test-generation", "performance-benchmark", "refactoring",
     "project-memory-management", "cms-development", "frontend-design",
-    "mysql-database",
+    "mysql-database", "project-knowledge-graph",
 }
 
 
@@ -126,7 +126,23 @@ def check_file(ref_root, src_path, src_name):
     return issues, checked
 
 
+def _fix_stdout_encoding():
+    """Windows 默认控制台为 GBK，直接 print emoji（✅/❌）会抛 UnicodeEncodeError。
+    若 stdout 编码非 utf-8 且无缓冲能力，回退到对无法编码字符做替换，保证脚本不崩。"""
+    try:
+        if sys.stdout.encoding and sys.stdout.encoding.lower().replace("-", "") not in (
+            "utf8", "utf8"
+        ):
+            import io
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer, encoding="utf-8", errors="replace"
+            )
+    except Exception:
+        pass
+
+
 def main():
+    _fix_stdout_encoding()
     parser = argparse.ArgumentParser(
         description="跨文件步骤号一致性检查器",
         formatter_class=argparse.RawDescriptionHelpFormatter,

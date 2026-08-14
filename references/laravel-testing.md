@@ -1,4 +1,4 @@
-# Laravel 测试专项参考
+﻿# Laravel 测试专项参考
 
 > 本文件是 `test-generation` 的 Laravel/PHPUnit 补充参考，不作为独立子技能计数。命中 Laravel、PHPUnit、Pest、Feature Test、Factory、Queue fake、HTTP fake、Sanctum 等信号时按需加载。
 
@@ -72,7 +72,7 @@ public function test_user_can_update_own_profile(): void
 ## Fake 与 Mock
 
 | 工具 | 用途 | 断言 |
-| --- | --- | --- |
+| - | - | - |
 | `Queue::fake()` | 队列任务 | `assertPushed()`、`assertNothingPushed()` |
 | `Event::fake()` | 领域事件 | `assertDispatched()` |
 | `Notification::fake()` | 通知 | `assertSentTo()` |

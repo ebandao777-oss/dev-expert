@@ -12,9 +12,52 @@ hook 跑的是工作区内真实文件（非 tempfile），故输出判定稳定
 import sys
 import os
 import json
+import shutil
 import subprocess
 
-PHP = r"F:\BtSoft\php\85\php.exe"
+# PHP 可执行文件探测协议（对齐 references/cms-development.md「PHP 可执行文件探测协议」）：
+# 严禁硬编码唯一路径，按优先级链解析，换机/换用户/跨平台可用。
+_WIN_CANDIDATES = [
+    r"F:\BtSoft\php\{ver}\php.exe",
+    r"D:\phpstudy\php\{ver}\php.exe",
+    r"C:\xampp\php\php.exe",
+    r"C:\Program Files\php\php.exe",
+]
+_MAC_CANDIDATES = [
+    "/opt/homebrew/bin/php@{ver}",
+    "/usr/local/bin/php@{ver}",
+    "/Applications/MAMP/bin/php/php{ver}/bin/php",
+]
+_LIN_CANDIDATES = [
+    "/usr/bin/php{ver}",
+    "/usr/local/bin/php{ver}",
+    "/opt/php/{ver}/bin/php",
+]
+# 版本号高到低探测（含本机 F:\BtSoft\php\85 等）
+_VERSIONS = ["85", "84", "83", "82", "81", "80", "74"]
+
+
+def resolve_php():
+    """按探测协议解析 PHP 可执行文件路径；全部未命中返回 None（调用方静默跳过）。"""
+    env = os.environ.get("PHP_BIN")
+    if env and os.path.isfile(env):
+        return env
+    # 多版本环境变量（PHP_85 / PHP_82 ...）
+    for ver in _VERSIONS:
+        envv = os.environ.get("PHP_" + ver)
+        if envv and os.path.isfile(envv):
+            return envv
+    # 系统 PATH
+    p = shutil.which("php")
+    if p:
+        return p
+    # 常见安装位置自动扫描
+    for tpl in _WIN_CANDIDATES + _MAC_CANDIDATES + _LIN_CANDIDATES:
+        for ver in _VERSIONS:
+            cand = tpl.format(ver=ver)
+            if os.path.isfile(cand):
+                return cand
+    return None
 
 
 def main():
@@ -41,9 +84,14 @@ def main():
     if not os.path.isfile(path):
         return 0
 
+    php_bin = resolve_php()
+    if not php_bin:
+        # PHP 不可解析（未配置 PHP_BIN 且不在 PATH/常见位置）：静默跳过，避免误报卡住工作
+        return 0
+
     try:
         r = subprocess.run(
-            [PHP, "-l", path],
+            [php_bin, "-l", path],
             capture_output=True, text=True, timeout=30,
         )
     except Exception:
