@@ -15,9 +15,10 @@ import json
 import os
 import re
 import sys
+import time
 
 # ---------- 默认排除目录（规划 §5.6 #7） ----------
-EXCLUDE_DIRS = {
+DEFAULT_EXCLUDE_DIRS = {
     # 依赖/构建产物
     'vendor', 'node_modules', 'dist', 'build', '__pycache__', '.cache',
     # 版本控制（避免抽 .git/.hg/.svn 内部文件）
@@ -49,6 +50,30 @@ EXCLUDE_DIRS = {
     'target',       # Maven / Eclipse 构建产物
 }
 
+# 运行时排除集（由 init_exclude_dirs 在 main 开头初始化，合并默认 + .graphignore + --exclude）
+_EXCLUDE_DIRS = set(DEFAULT_EXCLUDE_DIRS)
+
+
+def load_exclude_dirs(root, extra=None):
+    """合并默认排除 + .graphignore + CLI --exclude。
+
+    .graphignore 格式：每行一个目录名（不含路径分隔符），# 开头为注释，空行忽略。
+    """
+    dirs = set(DEFAULT_EXCLUDE_DIRS)
+    gi = os.path.join(root, '.graphignore')
+    if os.path.isfile(gi):
+        try:
+            with open(gi, encoding='utf-8', errors='ignore') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        dirs.add(line.rstrip('/\\'))
+        except Exception:
+            pass
+    if extra:
+        dirs.update(x.strip().rstrip('/\\') for x in extra.split(',') if x.strip())
+    return dirs
+
 # ---------- 纳入图谱的源码扩展名（遍历与新鲜度检测须一致） ----------
 SRC_EXTS = ('.php', '.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx',
             '.py', '.java', '.htm', '.html', '.css', '.scss', '.less')
@@ -61,6 +86,8 @@ RE_CLASS = [
     re.compile(r"(?:class|interface|trait|enum)\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+implements\s+([\w\s,]+))?"),
     re.compile(r"(?:public\s+|private\s+|protected\s+)?function\s+(\w+)\s*\("),
 ]
+# ---------- @decision 决策锚点（记忆完善方案A：代码处注释，零 token 自动抽取） ----------
+RE_DECISION = re.compile(r"@decision\s+([A-Za-z0-9_\-]+)\s+(.+?)(?=\n|$)", re.M)
 # ---------- 命名空间 / use（覆盖 composer PSR-4 框架：ThinkPHP/易优/迅睿/FastAdmin/Laravel） ----------
 RE_NAMESPACE = re.compile(r"^\s*namespace\s+([\w\\]+)\s*;", re.M)
 RE_USE = re.compile(r"^\s*use\s+([\w\\]+)(?:\s+as\s+(\w+))?\s*;", re.M)
@@ -72,6 +99,14 @@ RE_JS_IMPORT = re.compile(r"import\s+(?:[^'\"(]*?\s+from\s+)?['\"]([^'\"]+)['\"]
 RE_JS_DYNAMIC_IMPORT = re.compile(r"import\s*\(\s*['\"]([^'\"]+)['\"]\s*\)")
 RE_JAVA_IMPORT = re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+)\s*;", re.M)
 RE_JAVA_PKG = re.compile(r"^\s*package\s+([\w.]+)\s*;", re.M)
+# Java 类型定义与 extends/implements（上游链：改父类/接口时可反查子类/实现类）
+# 均以行首 + 修饰符白名单锚定，减少注释/字符串内 `class` 的误抽（与 RE_JAVA_IMPORT 同风格）。
+_JV_MOD = r"(?:public\s+|protected\s+|private\s+|abstract\s+|final\s+|sealed\s+|non-sealed\s+|static\s+)*"
+RE_JAVA_TYPE = re.compile(r"^\s*" + _JV_MOD + r"(?:class|interface|enum|record)\s+(\w+)", re.M)
+RE_JAVA_EXTENDS = re.compile(
+    r"^\s*" + _JV_MOD + r"(?:class|interface)\s+\w+\s+extends\s+([\w.$]+(?:\s*,\s*[\w.$]+)*)", re.M)
+RE_JAVA_IMPLEMENTS = re.compile(
+    r"^\s*" + _JV_MOD + r"(?:class|enum|record)\s+\w+(?:\s+extends\s+[\w.$]+)?\s+implements\s+([\w.$,\s]+)", re.M)
 # ---------- ThinkPHP 显式类库导入（TP3/TP5 官方机制，thinkphp.cn/info/126） ----------
 RE_TP_IMPORT = re.compile(r"(import|vendor|Loader::import)\s*\(\s*['\"]([^'\"]+)['\"]")
 
@@ -123,17 +158,87 @@ def _resolve_const_include(head, lit, rel, const_table, root):
     return target
 
 
-def strip_php_comments(text):
-    """B2：抽取 include 前剥离 PHP 注释，避免 `// include('x')` 类注释/死代码被当真边。
+def read_text(path):
+    """读文本文件：UTF-8 BOM 自动剥 + UTF-8 解码失败回退 GBK。
 
-    启发式（非解析器）：先等量换行去块注释，再按行处理 `//`/`#`——仅当注释符前为行首空白或
-    语句结束符(`;`/`}`/`{`/`)`)才视为注释，降低误伤字符串内 `http://` 的概率。
-    已知局限：字符串内注释符仍可能误剥。
+    解决帝国 CMS 等 GBK 编码文件的中文路径/注释抽取漏报（errors='ignore' 会丢字节致路径截断）。
     """
-    # 1) 去块注释：用等量换行替换（保行数），避免后续真实符号 loc 行号上移（可选4 修正）
-    text = re.sub(r"/\*.*?\*/", lambda _m: '\n' * _m.group(0).count('\n'), text, flags=re.S)
+    with open(path, 'rb') as f:
+        raw = f.read()
+    if raw.startswith(b'\xef\xbb\xbf'):
+        raw = raw[3:]
+    try:
+        return raw.decode('utf-8')
+    except UnicodeDecodeError:
+        try:
+            return raw.decode('gbk')
+        except UnicodeDecodeError:
+            return raw.decode('utf-8', errors='ignore')
+
+
+def strip_php_comments(text):
+    """B2：抽取 include 前剥离 PHP 注释，避免注释/死代码被当真边。
+
+    启发式（非解析器）：
+    - 块注释：字符串感知状态机剥离，跳过字符串内的 /* */（4c 增强，避免误删 $sql="/* x */"）
+    - heredoc/nowdoc：跳过 heredoc 内的 # //（4b 增强，避免误剥 SQL 内 #）
+    - 行注释：// 和 #，仅当注释符前为行首空白或语句结束符才视为注释
+    已知局限：跨行字符串状态可能误判（罕见）。
+    """
+    # 1) 块注释：字符串感知状态机，跳过字符串内的 /* */
+    out_chars = []
+    in_str = False
+    quote = ''
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if in_str:
+            if ch == '\\' and i + 1 < n:
+                out_chars.append(text[i:i + 2])
+                i += 2
+                continue
+            out_chars.append(ch)
+            if ch == quote:
+                in_str = False
+            i += 1
+        else:
+            if ch in ('"', "'"):
+                in_str = True
+                quote = ch
+                out_chars.append(ch)
+                i += 1
+            elif ch == '/' and i + 1 < n and text[i + 1] == '*':
+                end = text.find('*/', i + 2)
+                if end == -1:
+                    nl = text.find('\n', i)
+                    if nl == -1:
+                        nl = n
+                    out_chars.append('\n' * text[i:nl].count('\n'))
+                    i = nl
+                else:
+                    out_chars.append('\n' * text[i:end + 2].count('\n'))
+                    i = end + 2
+            else:
+                out_chars.append(ch)
+                i += 1
+    text = ''.join(out_chars)
+    # 2) 行注释：跳过 heredoc 内的 # //，仅当注释符前为行首空白或语句结束符才视为注释
     out = []
+    in_heredoc = False
+    heredoc_tag = ''
     for line in text.split('\n'):
+        if in_heredoc:
+            out.append(line)
+            if line.strip().rstrip(';,').rstrip() == heredoc_tag:
+                in_heredoc = False
+            continue
+        m = re.match(r'^\s*<<<?\s*([\'"]?)(\w+)\1', line)
+        if m:
+            in_heredoc = True
+            heredoc_tag = m.group(2)
+            out.append(line)
+            continue
         # 找行注释起点：遍历字符，遇未闭合引号内的 // # 跳过
         in_s = False
         quote = ''
@@ -390,12 +495,13 @@ def fqn_to_file(fqn, composer, root):
             if os.path.isfile(os.path.join(root, rel)):
                 return rel.replace(os.sep, '/')
             return rel.replace(os.sep, '/')  # 即便文件暂缺也返回预期路径（标悬空）
-    # PSR-0：每段映射
+    # PSR-0：每段映射（\ 和 _ 都转目录分隔符，PSR-0 规范）
     for pref in sorted(composer['psr0'], key=len, reverse=True):
         if fqn == pref or fqn.startswith(pref + '\\'):
-            rest = fqn[len(pref):].lstrip('\\').split('\\')
+            rest = fqn[len(pref):].lstrip('\\').replace('\\', '/').replace('_', '/')
+            rest_parts = [p for p in rest.split('/') if p]
             d = composer['psr0'][pref]
-            rel = os.path.normpath(os.path.join(d, *rest)) + '.php'
+            rel = os.path.normpath(os.path.join(d, *rest_parts)) + '.php'
             if os.path.isfile(os.path.join(root, rel)):
                 return rel.replace(os.sep, '/')
             return rel.replace(os.sep, '/')
@@ -461,7 +567,7 @@ def resolve_module(spec, lang, rel, root):
             return os.path.relpath(c, root).replace(os.sep, '/')
         # 包路径相对源码根（com/x/Y.java 可能位于 root 下任意 java/ 子目录），递归搜索
         for dp, _, fns in os.walk(root):
-            if any(x in dp for x in EXCLUDE_DIRS):
+            if any(x in dp for x in _EXCLUDE_DIRS):
                 continue
             cand = os.path.join(dp, relp)
             if os.path.isfile(cand):
@@ -524,12 +630,21 @@ def resolve_tp_import(spec, root, const_table):
     return None
 
 
+def extract_decisions(text, rel):
+    """抽取代码处 @decision 注释锚点（决策记忆完善方案A）。从原始 text 抽（不经 :644 的 strip_php_comments，否则注释被剥）。
+    返回 [{'id','text','line'}]；覆盖 // @decision / * @decision * / # @decision / <!-- @decision --> 任意形式。"""
+    out = []
+    for m in RE_DECISION.finditer(text):
+        out.append({'id': m.group(1), 'text': m.group(2).strip(),
+                    'line': text[:m.start()].count('\n') + 1})
+    return out
+
+
 def extract_file(path, root, const_table=None):
     """抽取单文件：返回 {includes, classes, calls, namespace, uses, tpl_includes}。"""
     text = ''
     try:
-        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-            text = f.read()
+        text = read_text(path)
     except Exception:
         return {'includes': [], 'classes': [], 'calls': [], 'namespace': None,
                 'uses': [], 'tpl_includes': []}
@@ -556,11 +671,11 @@ def extract_file(path, root, const_table=None):
         funcs = []
         for m in RE_CLASS[1].finditer(code):
             funcs.append(m.group(1))
-        # calls：new X() / X->method() / X::const（跨文件才记，规划 §4 敏感边约束）
+        # calls：new X() / X::const（跨文件才记，规划 §4 敏感边约束）
+        # 注：$obj->method() 抽不出类名（变量非类型，静态分析边界），属动态调用漏抽，
+        #     由 G2' grep 复核兜底；保留 new/:: 两类可静态解析类名的调用。
         calls = []
         for m in re.finditer(r"new\s+(\w+)\s*\(", code):
-            calls.append(m.group(1))
-        for m in re.finditer(r"(\w+)->\w+\s*\(", code):
             calls.append(m.group(1))
         for m in re.finditer(r"(\w+)::\w+", code):
             calls.append(m.group(1))
@@ -593,6 +708,8 @@ def extract_file(path, root, const_table=None):
     elif rel.endswith('.java'):
         lang = 'java'
     module_imports = []
+    java_types = []   # 本文件定义的类型名（class/interface/enum/record），供别处 extends/implements 反查
+    java_refs = []    # extends/implements 的被引用短名 —— 上游链（改父类/接口 → 反查子类）
     if lang == 'py':
         for m in RE_PY_IMPORT.finditer(text):
             module_imports.append(m.group(1) or m.group(2))
@@ -604,9 +721,18 @@ def extract_file(path, root, const_table=None):
         for m in RE_JS_DYNAMIC_IMPORT.finditer(text):
             module_imports.append(m.group(1))
     elif lang == 'java':
+        # package 声明不单独建边（模块归属由 import 边表达），此处仅记录、供 FQN 短名解析参考
         java_pkg = RE_JAVA_PKG.search(text)
         for m in RE_JAVA_IMPORT.finditer(text):
             module_imports.append(m.group(1))
+        java_types = [m.group(1) for m in RE_JAVA_TYPE.finditer(text)]
+        for rx in (RE_JAVA_EXTENDS, RE_JAVA_IMPLEMENTS):
+            for m in rx.finditer(text):
+                for part in m.group(1).split(','):
+                    # 去 FQN 前缀与泛型参数，只保留短名（如 a.b.Base<T> → Base）
+                    name = part.strip().split('.')[-1].split('<')[0].strip()
+                    if name and name not in java_refs:
+                        java_refs.append(name)
     # CSS @import 依赖（指向其它样式文件，真实样式级联依赖）
     css_imports = []
     if rel.endswith(('.css', '.scss', '.less')):
@@ -627,16 +753,52 @@ def extract_file(path, root, const_table=None):
             'funcs': funcs, 'calls': calls, 'namespace': namespace,
             'uses': uses, 'tpl_includes': tpl_includes, 'new_fqns': new_fqns,
             'lang': lang, 'module_imports': module_imports, 'tp_imports': tp_imports,
-            'css_imports': css_imports, 'html_assets': html_assets}
+            'css_imports': css_imports, 'html_assets': html_assets,
+            'java_types': java_types, 'java_refs': java_refs,
+            'decisions': extract_decisions(text, rel)}
+
+
+def _acquire_lock(root, max_wait=10, stale_timeout=60):
+    """获取构建锁，防多进程并发构建。等待 max_wait 秒，超 stale_timeout 的锁视为僵尸强制接管。"""
+    lock_path = os.path.join(root, '.ai-memory', 'knowledge-graph', '.lock')
+    for _ in range(max_wait):
+        if os.path.isfile(lock_path):
+            try:
+                age = time.time() - os.path.getmtime(lock_path)
+                if age > stale_timeout:
+                    break  # 僵尸锁，强制接管
+            except Exception:
+                break
+            time.sleep(1)
+        else:
+            break
+    try:
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+        with open(lock_path, 'w') as f:
+            f.write(str(os.getpid()))
+        return True
+    except Exception:
+        return False
+
+
+def _release_lock(root):
+    """释放构建锁。"""
+    lock_path = os.path.join(root, '.ai-memory', 'knowledge-graph', '.lock')
+    try:
+        if os.path.isfile(lock_path):
+            os.remove(lock_path)
+    except Exception:
+        pass
 
 
 def build(root):
     """全量构建。返回 (graph, meta, symbols)。"""
     out_dir = os.path.join(root, '.ai-memory', 'knowledge-graph')
+    _acquire_lock(root)  # 并发锁：防多进程同时构建（超 60s 僵尸锁强制接管）
     os.makedirs(out_dir, exist_ok=True)
     files = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS
+        dirnames[:] = [d for d in dirnames if d not in _EXCLUDE_DIRS
                        and not d.startswith('.')]
         for fn in filenames:
             if fn.endswith(SRC_EXTS):
@@ -647,7 +809,7 @@ def build(root):
     CONST_TABLE = {}
     for f, p in sorted(zip(file_list, files)):  # 常量预扫描按 rel 排序，避免同常量多定义时解析随遍历顺序漂移（B-1）
         try:
-            txt = open(p, 'r', encoding='utf-8', errors='ignore').read()
+            txt = read_text(p)
         except Exception:
             continue
         for nm, val in extract_defines(txt, f).items():
@@ -658,6 +820,7 @@ def build(root):
     nodes = {}      # rel -> {type, classes, funcs}
     edges = []      # {from, to, kind}
     edge_keys = set()  # 边去重键集合（B-4）：(from, to, kind) 精确去重，避免重复 require 产生重复边
+    decisions = {}  # 复合键 "rel::id" -> {id, text, file, line}（决策记忆方案A：@decision 锚点）
     symbols = {}    # name -> {file, line}
     fqn_symbols = {}  # FQN -> file（命名空间类，覆盖 composer 框架）
     dangling = []
@@ -674,6 +837,10 @@ def build(root):
                 fqn_symbols[(ns + '\\' + c['name']).lower()] = rel
         nodes[rel] = {'file': rel, 'classes': [c['name'] for c in ex['classes']],
                       'funcs': ex['funcs']}
+        # 决策锚点（方案A）：@decision 注释抽取，随代码自动沉淀、跨会话可查
+        for d in ex.get('decisions') or []:
+            decisions['%s::%s' % (rel, d['id'])] = {'id': d['id'],
+                                                   'text': d['text'], 'file': rel, 'line': d['line']}
 
     def add_edge_if_exists(rel, target_rel, kind, symbol=None):
         """已存在则加 include 边；否则记悬空（不进图）。"""
@@ -688,7 +855,7 @@ def build(root):
         if kind == 'include':
             include_total += 1
         if target_rel and os.path.exists(os.path.join(root, target_rel)):
-            if any(d in target_rel.split('/') for d in EXCLUDE_DIRS):
+            if any(d in target_rel.split('/') for d in _EXCLUDE_DIRS):
                 return
             if kind == 'include':
                 include_valid += 1
@@ -703,6 +870,19 @@ def build(root):
         else:
             dangling.append({'from': rel, 'raw': target_rel, 'resolved': target_rel,
                              'base': 'ns' if kind != 'include' else 'src'})
+
+    # Java 类型索引（仅扫描 Java 文件；**独立于 PHP 符号表 `symbols`**，避免污染其"PHP 专属"语义）
+    # 用途：`class A extends Base implements Foo` → 反查 Base/Foo 所在文件，生成 extends 边（上游链）
+    java_type_index = {}
+    java_dupes = 0
+    for _rel, _ex in extracted.items():
+        if _ex.get('lang') != 'java':
+            continue
+        for _t in _ex.get('java_types') or []:
+            if _t in java_type_index and java_type_index[_t] != _rel:
+                java_dupes += 1     # 短名冲突：保留先到者，宁缺勿错（不建歧义边）
+                continue
+            java_type_index[_t] = _rel
 
     for rel, ex in extracted.items():
         for c in ex['classes']:
@@ -742,6 +922,14 @@ def build(root):
                 tgt = resolve_module(spec, ex['lang'], rel, root)
                 if tgt and tgt != rel:
                     add_edge_if_exists(rel, tgt, 'import', symbol=spec)
+        # Java 继承/实现边（`class A extends Base implements Foo`）——**上游链核心**：
+        # 改父类/接口时 `--direction up` 可反查到所有子类/实现类（此前只有 import 边，继承关系完全不在图内）。
+        # 目标必须命中内置索引（文件真实存在由 add_edge_if_exists 二次校验），宁缺勿错。
+        if ex.get('lang') == 'java':
+            for ref in ex.get('java_refs') or []:
+                tgt = java_type_index.get(ref)
+                if tgt and tgt != rel:
+                    add_edge_if_exists(rel, tgt, 'extends', symbol=ref)
         # 模板 {include file=}（帝国/Dede/Discuz/易优 模板依赖）
         for tpl in ex['tpl_includes']:
             trel = os.path.normpath(tpl.lstrip('/'))
@@ -766,13 +954,32 @@ def build(root):
                     edge_keys.add(key)
                     edges.append({'from': rel, 'to': symbols[call]['file'],
                                   'kind': 'calls', 'symbol': call})
+        # 决策锚点边（方案A）：file --decision--> decision 锚点（graph.md 展示用；
+        # query 不依赖此边遍历，改由子图文件集直接筛 graph['decisions']，防子图爆炸）
+        for d in ex.get('decisions') or []:
+            edges.append({'from': rel, 'to': 'decision:%s::%s' % (rel, d['id']),
+                          'kind': 'decision'})
 
-    # 孤儿检测（规划 §5.6② 仅告警不裁决）
+    # 孤儿检测（规划 §5.6② 仅告警不裁决）：定义了但无人 extends/use/calls 引用的符号
+    referenced = set()
+    for ex in extracted.values():
+        for c in ex['classes']:
+            if c.get('extends'):
+                referenced.add(c['extends'].lstrip('\\').split('\\')[-1].lower())
+        for u in ex['uses']:
+            referenced.add(u.split('\\')[-1].lower())
+        for call in ex['calls']:
+            referenced.add(call.lower())
+    seen_orphan = set()
     for name, loc in symbols.items():
-        pass  # symbols 自身即定义源；孤儿针对 graph 节点引用无定义符号——此处无独立 graph 节点集，留口
-    # 符号孤儿：edges 中 to 为符号文件不存在者（已在 exists 判断处理）
+        short = name.split('\\')[-1].lower()
+        if short not in referenced:
+            key = (loc['file'], loc.get('line', 0), short)
+            if key not in seen_orphan:
+                seen_orphan.add(key)
+                orphan_symbols.append({'name': name, 'file': loc['file'], 'line': loc.get('line', 0)})
 
-    graph = {'nodes': nodes, 'edges': edges}
+    graph = {'nodes': nodes, 'edges': edges, 'decisions': decisions}
     meta = {
         'built_at': __import__('datetime').datetime.now().isoformat(),
         'tool_version': '1.0.0',
@@ -787,14 +994,21 @@ def build(root):
             'edges_dangling': len(dangling),
             'symbols_total': len(symbols),
             'symbols_resolved': len(symbols),
+            'java_types_indexed': len(java_type_index),
+            'java_type_dupes': java_dupes,
             'symbols_orphan': len(orphan_symbols),
+            'decisions_total': len(decisions),
             'static_coverage': round(include_valid / include_total, 3) if include_total else 1.0,
             'include_total': include_total,
             'include_valid': include_valid,
             'lsp_available': lsp,
         },
         'dangling_edges': dangling,
+        'orphan_symbols': orphan_symbols,
         'script_hash': file_hash(os.path.abspath(__file__)),
+        # composer.json 哈希：autoload 映射改了 must 重建（extends/use 边依赖 PSR-4 映射）
+        'composer_hash': file_hash(os.path.join(root, 'composer.json'))
+            if os.path.isfile(os.path.join(root, 'composer.json')) else None,
     }
     # 原子写（规划 §5.5）
     _atomic_write(os.path.join(out_dir, 'graph.json'), graph)
@@ -805,6 +1019,7 @@ def build(root):
           f"悬空 {meta['accuracy_report']['edges_dangling']}（已剔除）/ "
           f"include解析率 {meta['accuracy_report']['static_coverage']} / LSP: "
           f"{','.join(k for k, v in lsp.items() if v) or 'none'}")
+    _release_lock(root)
     return graph, meta, symbols
 
 
@@ -824,11 +1039,17 @@ def _write_markdown(path, graph, root):
     lines.append('## 边')
     for e in graph['edges']:
         lines.append(f"- {e['from']} --{e['kind']}--> {e['to']}")
+    decisions = graph.get('decisions', {})
+    if decisions:
+        lines.append('')
+        lines.append('## 决策')
+        for _dk, _dv in decisions.items():
+            lines.append(f"- {_dv['file']}:{_dv.get('line', 0)} @decision {_dv['id']}: {_dv['text']}")
     with open(path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
 
-def query(graph, meta, symbols, root, q, direction='both', depth=2, all_cycles=False):
+def query(graph, meta, symbols, root, q, direction='both', depth=2, all_cycles=False, max_nodes=80):
     """§9 查询接口 + 环检测，返回裁剪子图。
 
     all_cycles: False=仅检测 direction 可达闭包内的环（与「只警告已遍历子图」一致，
@@ -867,7 +1088,7 @@ def query(graph, meta, symbols, root, q, direction='both', depth=2, all_cycles=F
         if e['kind'] not in edge_kind_map[key]:
             edge_kind_map[key].append(e['kind'])
 
-    MAX_NODES = 80  # 节点预算硬上限（规划 §9 省 token：防枢纽模块 2 跳爆炸）
+    MAX_NODES = max_nodes  # 节点预算硬上限（规划 §9 省 token：防枢纽模块 2 跳爆炸）
     visited = set()    # 全局去重：该节点已纳入子图（不论是否在当前递归路径）
     stack = set()      # 当前递归路径（仅用于真环判定的回边检测）
     subgraph_nodes = {}
@@ -965,7 +1186,14 @@ def query(graph, meta, symbols, root, q, direction='both', depth=2, all_cycles=F
     walk(entry, 0)
     if cycles[0]:
         print(f"[GRAPH-CYCLE] 检测到 {cycles[0]} 个环（已在子图中折叠）")
-    return {'nodes': subgraph_nodes, 'edges': subgraph_edges, 'cycle': cycles[0]}
+    # 决策记忆合并（方案A）：子图文件集（visited）关联的 @decision 锚点一并返回，
+    # 跨会话查图谱即见「代码长啥样 + 为什么这样写」。query 不依赖 decision 边遍历（防爆炸）。
+    subgraph_decisions = []
+    for _dk, _dv in graph.get('decisions', {}).items():
+        if _dv.get('file') in visited:
+            subgraph_decisions.append(_dv)
+    return {'nodes': subgraph_nodes, 'edges': subgraph_edges, 'cycle': cycles[0],
+            'decisions': subgraph_decisions}
 
 
 def _graph_files_present(root):
@@ -976,20 +1204,27 @@ def _graph_files_present(root):
 
 
 def need_rebuild(root):
-    """规划 §6 新鲜度：比对 mtime+内容哈希。"""
+    """规划 §6 新鲜度：比对 mtime+内容哈希。
+
+    返回 (stale, changed_files)：
+    - changed_files: set of changed file rels（增量提示），None 表示需全量重建
+      （脚本升级/composer.json 变更/文件删除/产物缺失等无法增量的情况）。
+    注意：即便返回 changed_files，build 仍全量 extract——因 CONST_TABLE 全局依赖
+    （改 A.php 的 define 会影响 B.php 的 include 解析），extract 增量风险过高，留作 v2。
+    """
     meta_path = os.path.join(root, '.ai-memory', 'knowledge-graph', 'meta.json')
     if not os.path.exists(meta_path):
-        return True, 0
+        return True, None
     try:
         with open(meta_path, encoding='utf-8') as f:
             meta = json.load(f)
     except Exception:
-        return True, 0
-    changed = 0
+        return True, None
+    changed_files = set()
     current_rels = set()  # B3：记录现存源文件，检测"删除"
     mtimes = meta.get('file_mtimes', {})  # 廉价 mtime 前置过滤：mtime 未变则内容必未变
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS
+        dirnames[:] = [d for d in dirnames if d not in _EXCLUDE_DIRS
                        and not d.startswith('.')]
         for fn in filenames:
             if fn.endswith(SRC_EXTS):
@@ -1001,14 +1236,20 @@ def need_rebuild(root):
                     continue
                 h = file_hash(p)
                 if rel not in meta.get('file_hashes', {}) or meta['file_hashes'][rel] != h:
-                    changed += 1
-    # B3：meta 记录的文件已不在当前树（被删）→ 触发重建，避免残留悬空边
+                    changed_files.add(rel)
+    # B3：meta 记录的文件已不在当前树（被删）→ 无法增量，返回 None
     if set(meta.get('file_hashes', {})) - current_rels:
-        changed += 1
-    # 脚本版本校验：升级应触发重建
+        return True, None
+    # 脚本版本/composer.json 变化：无法增量，返回 None
     if meta.get('script_hash') != file_hash(os.path.abspath(__file__)):
-        changed += 1
-    return changed > 0, changed
+        return True, None
+    cj = os.path.join(root, 'composer.json')
+    if os.path.isfile(cj):
+        if file_hash(cj) != meta.get('composer_hash'):
+            return True, None
+    elif meta.get('composer_hash') is not None:
+        return True, None
+    return len(changed_files) > 0, changed_files
 
 
 def main():
@@ -1022,11 +1263,17 @@ def main():
                     help='跳过新鲜度检测，直接复用已缓存图谱（仅在确认图谱新鲜的连续查询时使用）')
     ap.add_argument('--all-cycles', action='store_true',
                     help='全局环检测：对任意查询都全图 DFS 预警循环依赖（不受 --direction 闭包限制），默认关')
-
+    ap.add_argument('--exclude', default=None,
+                    help='追加排除目录（逗号分隔），合并到默认排除 + .graphignore')
+    ap.add_argument('--max-nodes', type=int, default=80,
+                    help='查询子图节点预算硬上限（默认 80，防枢纽模块爆炸）')
     ap.add_argument('--selftest', action='store_true',
                     help='运行内置 E2E 自检（删文件无悬挂边 + 改文件过期判定），不改交付物')
     args = ap.parse_args()
     root = os.path.abspath(args.root)
+    # 初始化运行时排除集（合并默认 + .graphignore + --exclude）
+    _EXCLUDE_DIRS.clear()
+    _EXCLUDE_DIRS.update(load_exclude_dirs(root, args.exclude))
     if args.selftest:
         import tempfile as _tf
         import shutil as _shutil
@@ -1161,6 +1408,77 @@ def main():
         print('[E2E-9] 全局(--all-cycles,down,entry=X) 环数: %s (期望 1)' % _r9_all['cycle'])
         assert _r9_all['cycle'] == 1, '[E2E-9] 全局模式漏报全图环: %s' % _r9_all['cycle']
         print('[E2E-9] 通过：全局环检测开关生效且不破坏默认闭包行为')
+        # E2E-10: Java 上游链（extends/implements 边）——改父类/接口能反查到子类/实现类。
+        # 三段断言：① 类型与继承引用抽取 ② 真实建图产出 extends 边 ③ query up 语义反查。
+        _jdir = os.path.join(work, '__kg_java_fixture__')
+        os.makedirs(_jdir, exist_ok=True)
+        _jfx = (
+            ('Base.java', "package p;\npublic class Base {}\n"),
+            ('Foo.java', "package p;\npublic interface Foo {}\n"),
+            ('A.java', "package p;\npublic class A extends Base implements Foo {}\n"),
+        )
+        for _n, _src in _jfx:
+            with open(os.path.join(_jdir, _n), 'w', encoding='utf-8') as _f:
+                _f.write(_src)
+        _ex_a = extract_file(os.path.join(_jdir, 'A.java'), work)
+        _ex_base = extract_file(os.path.join(_jdir, 'Base.java'), work)
+        print('[E2E-10] A.java 类型抽取:', _ex_a['java_types'], '(期望 [A])')
+        print('[E2E-10] A.java 继承引用:', _ex_a['java_refs'], '(期望含 Base/Foo)')
+        assert _ex_a['java_types'] == ['A'], '[E2E-10] Java 类型未抽取: %s' % _ex_a['java_types']
+        assert 'Base' in _ex_a['java_refs'] and 'Foo' in _ex_a['java_refs'], \
+            '[E2E-10] extends/implements 未抽取: %s' % _ex_a['java_refs']
+        assert _ex_base['java_types'] == ['Base'], '[E2E-10] Base 类型未抽取'
+        _g10, _m10, _s10 = build(work)
+        _e10 = [e for e in _g10['edges']
+                if e.get('kind') == 'extends' and e['from'].endswith('__kg_java_fixture__/A.java')]
+        print('[E2E-10] 建图产出的 Java extends 边:', _e10, '(期望 2 条)')
+        assert len(_e10) == 2, '[E2E-10] Java 继承边未进图: %s' % _e10
+        _g10q = {'nodes': {'x/A.java': {}, 'x/Base.java': {}, 'x/Foo.java': {}},
+                 'edges': [{'from': 'x/A.java', 'to': 'x/Base.java', 'kind': 'extends'},
+                           {'from': 'x/A.java', 'to': 'x/Foo.java', 'kind': 'extends'}]}
+        _r10 = query(_g10q, {}, {}, work, 'x/Base.java', direction='up', depth=2)
+        print('[E2E-10] 查 Base 上游:', sorted(_r10['nodes'].keys()), '(期望含 x/A.java)')
+        assert 'x/A.java' in _r10['nodes'], '[E2E-10] 改父类反查不到子类（上游链断裂）'
+        print('[E2E-10] 通过：Java extends/implements 抽取、建边与上游反查均正常')
+        # E2E-11: @decision 注释抽取（决策记忆完善方案A）。构造含 @decision 的 PHP fixture，
+        # build 后断言 graph['decisions'] 含该决策、edges 含 decision 边、query(fixture) 返回 decisions 含该条。
+        # 注意：fixture 字符串用拼接避免 build_graph.py 源码直接含连续 "@decision" 子串（否则自扫描误抽噪声）。
+        _dec_marker = "@" + "decision"
+        _dfx_dir = os.path.join(work, '__kg_decision_fixture__')
+        os.makedirs(_dfx_dir, exist_ok=True)
+        _dfx = os.path.join(_dfx_dir, 'decision.php')
+        with open(_dfx, 'w', encoding='utf-8') as _f:
+            _f.write("<?php\n" + "// " + _dec_marker +
+                      " DEC-T1 为何选A：兼容性约束放弃B\n" + "class R1 {}\n")
+        build(work)
+        _g11, _, _ = load()
+        _dfx_rel = '__kg_decision_fixture__/decision.php'
+        _d11 = _g11.get('decisions', {})
+        _d11_hits = [k for k, v in _d11.items()
+                     if v.get('file') == _dfx_rel and v.get('id') == 'DEC-T1']
+        print('[E2E-11] 抽取命中决策:', _d11_hits, '(期望非空)')
+        assert _d11_hits, "[E2E-11] @decision 未抽取进 graph['decisions']"
+        _d11_edges = [e for e in _g11['edges']
+                      if e.get('kind') == 'decision' and e['from'] == _dfx_rel]
+        print('[E2E-11] decision 边:', len(_d11_edges), '(期望 1)')
+        assert len(_d11_edges) == 1, '[E2E-11] decision 边未进图: %s' % _d11_edges
+        _r11 = query(_g11, {}, {}, work, _dfx_rel, direction='both', depth=2)
+        print('[E2E-11] query 返回 decisions:', _r11.get('decisions'), '(期望含 DEC-T1)')
+        assert any(d.get('id') == 'DEC-T1' for d in _r11.get('decisions', [])), \
+            '[E2E-11] query 未合并返回决策'
+        print('[E2E-11] 通过：@decision 抽取 + 决策边 + query 合并均正常')
+        # E2E-12: 决策随代码跨会话保留（不依赖 agent 写）。删图谱产物后重建，决策仍在。
+        _kg_path = os.path.join(work, '.ai-memory', 'knowledge-graph')
+        assert os.path.isdir(_kg_path), '[E2E-12] 图谱目录缺失'
+        _shutil.rmtree(_kg_path)
+        build(work)
+        _g12, _, _ = load()
+        _d12 = _g12.get('decisions', {})
+        _d12_hits = [k for k, v in _d12.items()
+                     if v.get('file') == _dfx_rel and v.get('id') == 'DEC-T1']
+        print('[E2E-12] 重建后决策命中:', _d12_hits, '(期望非空==跨会话保留)')
+        assert _d12_hits, '[E2E-12] 重建后决策丢失（未随代码保留）'
+        print('[E2E-12] 通过：决策随代码跨会话自动保留')
         # E2E-3: 选一个被依赖的真实源文件，删之，重建后其依赖边应不残留（悬空已剔除）
         victim = None
         for e in g['edges']:
@@ -1185,8 +1503,9 @@ def main():
         # E2E-4: 改一个真实文件，need_rebuild 应报 stale
         orig = open(os.path.join(work, victim), encoding='utf-8', errors='ignore').read()
         open(os.path.join(work, victim), 'a', encoding='utf-8').write('\n// e2e touch\n')
-        stale, n = need_rebuild(work)
-        print('[E2E-4] 编辑后过期:', stale, '变更文件数:', n, '(期望 True/>0)')
+        stale, changed_info = need_rebuild(work)
+        cnt = len(changed_info) if changed_info else '全量'
+        print('[E2E-4] 编辑后过期:', stale, '变更文件数:', cnt, '(期望 True/>0)')
         open(os.path.join(work, victim), 'w', encoding='utf-8').write(orig)
         _shutil.rmtree(work)
         print('[SELFTEST] 完成（副本已清理，原交付物未改动）')
@@ -1201,14 +1520,19 @@ def main():
         if args.no_rebuild and _graph_files_present(root):
             print('[GRAPH-USED-CACHE] 跳过新鲜度检测，复用已缓存图谱')
         else:
-            stale, n = need_rebuild(root)
+            stale, changed_info = need_rebuild(root)
             # B1：meta.json 在但 graph.json/symbols.json 缺失（被误删/损坏）→ 即便源码未变也必须重建，
             # 否则下方直接 open(graph.json) 会抛 FileNotFoundError 崩溃。
             if stale or not _graph_files_present(root):
-                print(f"[GRAPH-STALE] 图谱可能过期（{n} 个文件变更/产物缺失），正在增量重建…")
-                build(root)  # v1 增量=全量重抽（四类覆盖在 build 内统一处理）
+                if changed_info:
+                    preview = ', '.join(sorted(changed_info)[:5])
+                    suffix = '…' if len(changed_info) > 5 else ''
+                    print(f"[GRAPH-STALE] {len(changed_info)} 个文件变更：{preview}{suffix}，正在重建…")
+                else:
+                    print("[GRAPH-STALE] 图谱过期（产物缺失/脚本升级/composer.json 变更），正在全量重建…")
+                build(root)  # 全量重抽保准确性（extract 增量因 CONST_TABLE 依赖风险留作 v2）
             else:
-                print(f"[GRAPH-FRESH] 图谱新鲜（{n} 变更）")
+                print("[GRAPH-FRESH] 图谱新鲜")
         with open(os.path.join(kg_dir, 'graph.json'), encoding='utf-8') as f:
             graph = json.load(f)
         with open(os.path.join(kg_dir, 'meta.json'), encoding='utf-8') as f:
@@ -1223,7 +1547,7 @@ def main():
             if not q:
                 continue
             sub = query(graph, meta, symbols, root, q, args.direction, args.depth,
-                        args.all_cycles)
+                        args.all_cycles, args.max_nodes)
             merged['nodes'].update(sub['nodes'])
             merged['edges'].extend(sub['edges'])
             merged['cycle'] += sub['cycle']

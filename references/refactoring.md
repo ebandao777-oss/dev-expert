@@ -1,4 +1,4 @@
-﻿# 重构建议
+# 重构建议
 
 ## 输入要求
 
@@ -160,7 +160,7 @@
 | 第六步：验证 | 原始测试用例缺失，无法回归 | 生成最小回归测试覆盖核心路径 | 1 | 标注"回归覆盖不足"，建议先走 测试用例生成 补全基线 |
 | 第七步：记录到项目记忆 | 项目记忆系统不可用 | 输出Decision Record到本地文件 | 1 | 标注"决策未沉淀"，提示用户手动保存 |
 
-## 关联Skill
+## 关联 reference
 
 - **karpathy-coding-guidelines**（Karpathy编码规范）— 重构后可用 `karpathy-coding-guidelines` 检查是否过度设计
 - **code-review**（代码审查）— 重构前可用 `code-review` 全面评估代码问题

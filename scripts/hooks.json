@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/backup_on_write.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/backup_on_write.py\"",
             "timeout": 10
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/guard_dirs.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/guard_dirs.py\"",
             "timeout": 10
           }
         ]
@@ -27,8 +27,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/plan_guard.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/plan_guard.py\"",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/precheck_on_write.py\"",
+            "timeout": 15
           }
         ]
       }
@@ -39,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/lint_on_write.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/lint_on_write.py\"",
             "timeout": 30
           }
         ]
@@ -49,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/php8_compat.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/php8_compat.py\"",
             "timeout": 20
           }
         ]
@@ -59,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/security_scan.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/java_compat.py\"",
             "timeout": 20
           }
         ]
@@ -69,7 +79,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/secret_scan.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/security_scan.py\"",
             "timeout": 20
           }
         ]
@@ -79,7 +89,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/utf8_check.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/secret_scan.py\"",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/utf8_check.py\"",
             "timeout": 10
           }
         ]
@@ -89,7 +109,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/debug_residue.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/debug_residue.py\"",
             "timeout": 10
           }
         ]
@@ -99,7 +119,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/select_star.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/select_star.py\"",
             "timeout": 10
           }
         ]
@@ -109,7 +129,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/dep_scan.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/dep_scan.py\"",
             "timeout": 10
           }
         ]
@@ -119,7 +139,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/sql_injection_check.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/sql_injection_check.py\"",
             "timeout": 15
           }
         ]
@@ -129,7 +149,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/cms_risk_check.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/cms_risk_check.py\"",
             "timeout": 15
           }
         ]
@@ -139,7 +159,57 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/capture_learning.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/capture_learning.py\"",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/errors_recall_guard.py\"",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/errors_dup_guard.py\"",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/graph_impact.py\"",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/memory_prune.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit|Bash|execute_command|run_command|run_in_terminal|terminal",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/rule_ref_guard.py\"",
             "timeout": 15
           }
         ]
@@ -151,7 +221,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "{{PYTHON_BIN}} \"{{HOOKS_DIR}}/handoff_snapshot.py\"",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/handoff_snapshot.py\"",
             "timeout": 20
           }
         ]

@@ -1,6 +1,6 @@
-﻿# Laravel 测试专项参考
+# Laravel 测试专项参考
 
-> 本文件是 `test-generation` 的 Laravel/PHPUnit 补充参考，不作为独立子技能计数。命中 Laravel、PHPUnit、Pest、Feature Test、Factory、Queue fake、HTTP fake、Sanctum 等信号时按需加载。
+> 本文件是 `test-generation` 的 Laravel/PHPUnit 补充参考，不作为独立子技能计数，也不提供 `@` 显式调用入口。命中 Laravel、PHPUnit、Pest、Feature Test、Factory、Queue fake、HTTP fake、Sanctum 等信号时按需加载。
 
 ## 测试分层
 

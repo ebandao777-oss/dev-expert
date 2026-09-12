@@ -48,7 +48,7 @@ def main():
     parser.add_argument(
         "--input",
         default=None,
-        help="输入 hooks.json 模板路径（默认：本脚本上级目录的 hooks.json）",
+        help="输入 hooks.json 模板路径（默认：<技能根>/scripts/hooks.json）",
     )
     parser.add_argument(
         "--output",
@@ -80,8 +80,8 @@ def main():
         print("[INSTALL-HOOKS] 错误：hooks 目录不存在: %s" % hooks_dir, file=sys.stderr)
         return 1
 
-    # 解析输入路径（默认上级目录的 hooks.json）
-    input_path = args.input or os.path.abspath(os.path.join(script_dir, "..", "hooks.json"))
+    # 解析输入路径（默认 <技能根>/scripts/hooks.json；配置源与部署器同目录）
+    input_path = args.input or os.path.abspath(os.path.join(script_dir, "..", "scripts", "hooks.json"))
     if not os.path.isfile(input_path):
         print("[INSTALL-HOOKS] 错误：hooks.json 模板不存在: %s" % input_path, file=sys.stderr)
         return 1

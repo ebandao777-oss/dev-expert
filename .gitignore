@@ -17,3 +17,9 @@ desktop.ini
 
 # 日志文件
 *.log
+
+# hooks 安装产物（每次 --apply 重写，非手写维护）
+scripts/hooks.installed.json
+
+# Python 缓存（脚本运行后自动生成）
+__pycache__/

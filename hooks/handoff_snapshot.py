@@ -21,7 +21,7 @@ MAX_FILES = 25
 EXCLUDE = {"backup", "vendor", "node_modules", "uploads",
            ".git", ".codebuddy", ".ai-memory", "ecachefiles",
            "__pycache__", "dist", "build", "cache", "tmp", "temp", "logs", "runtime"}
-# 排除备份/临时文件扩展名（避免 backup_on_write 的 .bak/.bak.1/.bak.2 污染快照）
+# 排除备份/临时文件扩展名（避免 backup_on_write 的 .bak / .bak.N 污染快照）
 EXCLUDE_EXT = {".bak", ".tmp", ".log", ".cache", ".pyc", ".swp", ".swo"}
 
 

@@ -1,4 +1,4 @@
-﻿# API设计
+# API设计
 
 ## 输入要求
 
@@ -212,7 +212,7 @@ API 设计完成后，将关键决策和规范记录到项目记忆（参见 `pr
 | 第六步：文档生成 | OpenAPI规范生成失败 | 降级为Markdown表格文档，标注"未生成机器可读spec" | 2 | 输出手写文档模板，建议人工补全 |
 | 第七步：记录到项目记忆 | 项目记忆系统不可用 | 输出Decision Record到本地文件 | 1 | 标注"记忆未沉淀"，提示用户手动保存 |
 
-## 关联Skill
+## 关联 reference
 
 - **tech-selection**（技术选型）— 设计前可用 `tech-selection` 确定API技术方案（REST/GraphQL/gRPC）
 - **code-generation**（代码生成）— 设计后可用 `code-generation` 生成API接口代码

@@ -1,4 +1,4 @@
-﻿# 风格对齐（Style Alignment / 风格嗅探协议）
+# 风格对齐（Style Alignment / 风格嗅探协议）
 
 ## 适用场景
 

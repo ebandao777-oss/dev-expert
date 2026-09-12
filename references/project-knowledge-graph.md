@@ -1,4 +1,4 @@
-﻿# 项目知识图谱（代码结构认知层）
+# 项目知识图谱（代码结构认知层）
 
 ## 输入要求
 
@@ -10,8 +10,9 @@
 
 - **受众**：图谱唯一受众是 agent 开发时借全局视角理解项目；**不生成 mermaid**（人类可视化源，agent 不加载，纯冗余）。人类兜底为 `graph.md`（文本邻接表，agent 不读）。
 - **与"任务依赖图"区分**：本图谱是**代码结构依赖（持久、跨会话）**；`task-decomposition` / `software-project` / `refactoring` 里的"依赖图"是**任务执行依赖（临时、本次任务内）**。前者称"代码结构图谱"，后者称"任务依赖"，命名严格拉开。
-- **与现有机制互补**：① 延迟加载协议——查图谱替代全仓扫；② `project-memory`——结构层 vs 决策层，互引不重叠；③ 不进记忆蒸馏、不参与 Git 团队共享。
+- **与现有机制互补**：① 延迟加载协议——查图谱替代全仓扫；② `project-memory`——结构层承载决策引用（`@decision` 锚点短摘要，见下「@decision 注释约定」），长文决策仍归 Decision Record；图谱只存锚点+ID+摘要，与 Decision Record 互引不重叠（Decision Record 写长文+撤销条件+影响范围）；③ 不进记忆蒸馏、不参与 Git 团队共享。
 - **纯 agent 加速器，非验证替代品**：正常改动靠它快定位；动刀前 grep 复核那一下不能省（见硬门禁）。
+- **高级进阶功能（非开箱即用）**：本专项须按自身环境适配（Python 解释器路径、`{PROJECT_ROOT}`、忽略目录）；`scripts/build_graph.py` 或 Python 不可用时，本专项**整体降级为 grep / 人工静态检查**，不阻塞主流程。
 
 ## 执行流程
 
@@ -40,6 +41,7 @@ python scripts/build_graph.py --root {PROJECT_ROOT} --selftest
 
 - **抽取技术**：v1 默认纯正则静态抽取（零依赖、跨平台、秒级、多语言通用，无 AST/tree-sitter）；LSP 仅做可用性探测（`detect_lsp` 记 `lsp_available`），抽取仍走正则（语义增强为可选留口，当前未实现）。结果写 `meta.json.lsp_available`。
 - **语言范围**：PHP / JS（一等支持）；Java / Python / TS / Go 同样建图（通用正则粗边），LSP 可用仅记录、不改变抽取方式。
+  - **Java 边类型**：`import`（包导入 → 解析到 `.java` 文件）+ **`extends` / `implements`（继承/实现 → 上游链）**——改父类或接口后，`--query <父类.java> --direction up` 可反查到全部子类/实现类。**不含**类/方法级符号，也不支持按符号名查询（`symbols` 表仍为 PHP 专属；Java 走独立的类型索引，不污染其语义）。
 - **原子写**：graph.json / meta.json / symbols.json 均先写 `.tmp` 再 `rename` 覆盖，避免半文件。
 - **抽取自校验（准确性硬保障，构建阶段强制）**：
   1. **边目标反查剔除悬空边**：每条 include/require/import 边解析为绝对路径后校验目标是否存在；不存在 → 判悬空边，**不写入有效边集**，仅记入 `meta.json.dangling_edges`（含源:行号 + 解析值 + 所用 base）。base 解析规则：源文件目录优先；无 `./`/`../` 前缀且非绝对 → 回退 include_path + 工作区根；两路都解析不到才判悬空。
@@ -57,7 +59,7 @@ python scripts/build_graph.py --root {PROJECT_ROOT} --query <file|symbol> [--dir
 - `--depth N`：**默认 2 跳**——防止一次查询把半个项目读进上下文，守住"省 token"承诺。
 - **环检测**：遍历维护已访问集合，遇已访问节点折叠标记 `cycle:true` 不再展开，杜绝 A→B→A 膨胀/死循环；输出附 `[GRAPH-CYCLE] 检测到 N 个环`。
 - **节点预算硬上限**：子图节点数超 `MAX_NODES=80` 即截断（防枢纽模块 2 跳爆炸，如 `connect.php`）。
-- **输出**：仅返回 N 跳内 `{nodes, edges, cycle}` 紧凑 JSON 片段（预计 2K–10K token）进入上下文。
+- **输出**：仅返回 N 跳内 `{nodes, edges, cycle, decisions}` 紧凑 JSON 片段（预计 2K–10K token）进入上下文；`decisions` 为子图文件集关联的 `@decision` 锚点摘要（`[{id, text, file, line}]`），跨会话即可见「代码长啥样 + 为什么这样写」。
 
 ### 第四步：新鲜度校验（最关键，防失效误导）
 
@@ -93,20 +95,21 @@ python scripts/build_graph.py --root {PROJECT_ROOT} --query <file|symbol> [--dir
 | **不触发** | 简单任务 / 单文件（L0） | — | — | 图谱是噪声，跳过 |
 
 - **P1 vs P2 不冲突**：P1 全量广度（喂 plan），P2 局部深度（喂执行），互补。
+- **P2 已自动兜底（前提：hooks 已部署；未部署则无此兜底，直接走 grep 复核）**：写入代码文件后，`hooks/graph_impact.py`（PostToolUse）自动附「上游 2 跳依赖摘要」（≤3 行送达 agent）；**图谱三件套（graph / meta / symbols）缺失或目标非代码文件 → 静默**，且走 `--no-rebuild` 只复用缓存、**绝不触发重建**；**仅摘要，完整影响面仍须 grep 复核（G1/G2'/G3 不变）**。agent 显式调用仍适用于更早（写盘前）或更深（`both` / `depth≥3`）的查询。
 - **默认链路**：`复杂任务 → Step 2 前 P1 查全量依赖 → 写 plan 依赖矩阵 → Step 3 改某模块前 P2 查上游 → 查后动作规范 → 执行`。
 
 ## 存储 Schema
 
 ```
 {PROJECT_ROOT}/.ai-memory/knowledge-graph/
-├── graph.json      # 节点 + 边（结构化，机器读，agent 唯一消费源）
+├── graph.json      # 节点 + 边 + decisions（结构化，机器读，agent 唯一消费源；decisions 为 @decision 锚点集合，key=rel::id）
 ├── meta.json       # 构建时间、工具版本、文件清单哈希、范围配置、覆盖率、accuracy_report、script_hash
 ├── graph.md        # 文本邻接表（人类可读兜底，agent 不加载）
 └── symbols.json    # 符号索引：类名/函数名 → 文件:行号（支撑 --query <symbol>）
 ```
 
 - **节点**：file（默认粒度）/ module（目录级聚合单元，按源码根下一级业务目录推导，v1 不做 namespace 细聚）。
-- **边类型**：`include`（含 require/require_once/include_once，统一归 include）`use`（命名空间 use）`autoload`（new \Ns\Class / \Ns\Class:: 自动加载）`extends`（类继承）`template`（{include file=}/template()）`tpimport`（ThinkPHP import()/vendor()/Loader::import()）`import`（非 PHP 语言模块导入）`cssimport`（CSS @import）`asset`（HTML link/script 资源）`calls`（跨文件调用）。注：`implements`/`require` 非独立边类型——`require` 并入 `include`，`implements` 作为类属性记录、不单独成边。
+- **边类型**：`include`（含 require/require_once/include_once，统一归 include）`use`（命名空间 use）`autoload`（new \Ns\Class / \Ns\Class:: 自动加载）`extends`（类继承）`template`（{include file=}/template()）`tpimport`（ThinkPHP import()/vendor()/Loader::import()）`import`（非 PHP 语言模块导入）`cssimport`（CSS @import）`asset`（HTML link/script 资源）`calls`（跨文件调用）`decision`（代码处 `@decision` 注释锚点 → 决策摘要，图谱人类兜底 `graph.md` 展示用，query 不依赖此边遍历）。注：`implements`/`require` 非独立边类型——`require` 并入 `include`，`implements` 作为类属性记录、不单独成边。
 - **敏感边约束**：`calls` 边只记跨文件/跨模块调用，过滤标准库/框架内置/密钥读取等内部调用，避免泄露敏感路径且降噪。
 - **不参与记忆蒸馏**：图谱基于代码、随代码重建，不纳入"超 30 天蒸馏/删除"。
 - **多工作区切换**：会话切换 `{PROJECT_ROOT}` 时图谱上下文随之切换，互不干扰。
@@ -117,6 +120,16 @@ python scripts/build_graph.py --root {PROJECT_ROOT} --query <file|symbol> [--dir
 - **人类兜底**：`graph.md`（文本邻接表），仅供人类开发者偶尔查看；**agent 不加载**。
 - **明确排除**：不生成 `graph.mmd` / mermaid；不在 README/FAQ 展示渲染图。
 
+## @decision 注释约定（决策记忆完善方案A）
+
+图谱只记结构、易脱锚；Decision Record 靠 agent 自觉写、覆盖率低。方案 A 在**代码处**写 `@decision` 注释，由 `build_graph.py` 正则抽取为 `graph.json.decisions` 锚点，零 LLM token、随代码自动跨会话沉淀，根治脱锚与覆盖率弱。
+
+- **写法**：任意注释形式均可，一行一句——`// @decision DEC-1 为何选A：兼容性约束放弃B（详见 project_memory Decision Record: 决策名）`；支持 `// @decision`（PHP/JS）、`/* @decision */`、`# @decision`（Python）、`<!-- @decision -->`（HTML 模板）。ID 全局建议唯一（跨文件同 ID 由复合键 `rel::id` 隔离）。
+- **抽取**：`build_graph.py` 从**原始源码**（不进 PHP 注释剥离）正则抽 `@decision\s+<ID>\s+<理由>`，生成 `rel::id -> {id, text, file, line}` 与 `file --decision--> decision` 边。
+- **查询**：`--query <file>` 返回 JSON 的 `decisions` 字段含该文件及依赖闭包内所有关联决策摘要；graph.md 末尾「## 决策」区人类可读。
+- **与 Decision Record 互补**：`@decision` 写**代码处一句话锚点+ID**（轻、随代码）；Decision Record 写**长文+选项分析+撤销条件+影响范围**（重、在 project_memory.md）。两者互引不重叠：注释里引 Decision Record 名称，Decision Record 的「影响文件」可补 `（见 <file> 的 @decision DEC-1）`。
+- **反选/关闭**：用户项目禁止代码加注释、或误报率高 → 在 `build_graph.py` 置 `RE_DECISION` 为空或加 `--no-decision` 开关关闭抽取（不影响结构图谱）。
+
 ## 质量标准
 
 1. 构建阶段 LLM token ≈ 0（输出写盘不进上下文）。
@@ -124,6 +137,7 @@ python scripts/build_graph.py --root {PROJECT_ROOT} --query <file|symbol> [--dir
 3. 自校验生效：悬空边不进有效边集、孤儿仅告警不裁决、构建日志输出 `[GRAPH-ACCURACY]`。
 4. 增量四类覆盖：删文件后图谱无悬挂边；改文件后查图谱触发过期判定（STALE）。
 5. 降级可用：构建失败不阻断主任务，回退临时 grep + 交付标注"图谱不可用"。
+6. 决策抽取准确：selftest E2E-11（@decision 抽取+决策边+query 合并）与 E2E-12（决策随代码跨会话保留）通过；Decision Record 与 @decision 锚点互引不重叠。
 
 ## 失败回退机制
 

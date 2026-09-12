@@ -1,4 +1,4 @@
-﻿# CMS二次开发
+# CMS二次开发
 
 面向基于 PHP+MySQL 的 CMS 二次开发场景，提供从环境探测、兼容性修复、插件开发到安全加固的全链路指引。覆盖 EmpireCMS、WordPress、ThinkPHP、Laravel 等主流 CMS/框架。
 
@@ -45,12 +45,12 @@
 | - | - | - | - |
 | EmpireCMS 7.5 | 7.4 | 8.2 | 需 PHP 8 兼容补丁 |
 | WordPress 6.x | 7.4 | 8.2 | 部分老插件可能不兼容 8.3+ |
-| ThinkPHP 6 | 7.4 | 8.2 |  |
-| ThinkPHP 8 | 8.0 | 8.2 |  |
-| Laravel 9 | 8.0 | 8.1 |  |
-| Laravel 10 | 8.1 | 8.2 |  |
-| Laravel 11 | 8.2 | 8.3 |  |
-| CodeIgniter 4 | 7.4 | 8.2 |  |
+| ThinkPHP 6 | 7.4 | 8.2 | |
+| ThinkPHP 8 | 8.0 | 8.2 | |
+| Laravel 9 | 8.0 | 8.1 | |
+| Laravel 10 | 8.1 | 8.2 | |
+| Laravel 11 | 8.2 | 8.3 | |
+| CodeIgniter 4 | 7.4 | 8.2 | |
 | DedeCMS v5.7 | 5.6 | 7.4 | 不支持 PHP 8 |
 | Hyperf | 8.0 | 8.2 | 建议跟随 Swoole 版本 |
 
@@ -109,7 +109,7 @@
 
 | MySQL 类型 | PHP 类型 | 说明 |
 | - | - | - |
-| INT/BIGINT | `int` |  |
+| INT/BIGINT | `int` | |
 | DECIMAL | `string` | 禁止 float，防金额精度丢失 |
 | DATETIME | `DateTimeImmutable` | 或 CMS 原生时间类 |
 | JSON | `array` | MySQL 5.7+ 原生类型 |
@@ -286,6 +286,17 @@ CMS 官方规范 > `.editorconfig`/`phpcs.xml` > **风格基线（项目现有�
 | 7 | 长任务防卡死 | 批量任务采用 Init → Step → Poll，Step 有批量大小和进度持久化 |
 | 8 | 依赖锁定 | 检查 `composer.lock` 是否存在并提交；`composer.json` 中无 `latest`/`*`/`dev-main` 浮动版本 |
 
+**验证证据类型声明**（对齐主流程 Step 4，CMS 场景必填）：
+
+| 证据类型 | 适用场景 | 最小字段 |
+| - | - | - |
+| 命令+输出 | PHP lint、PHP8 兼容扫描、grep 检查（数组键引号/裸 SQL/输出转义） | 命令文本 + 退出码 + 关键输出片段 |
+| API 响应 | Init/Step/Poll 长任务接口联调（批量同步/导入导出/生成静态页） | Status Code + Response Body + 请求参数 |
+| 测试报告 | 插件功能测试、批量任务回归、事务回滚验证 | 测试用例数、通过数、失败用例清单 |
+| 截图+步骤 | 后台管理页面、CMS 模板渲染、H5 页面 | 截图 + 操作步骤 + 浏览器/PHP 版本 |
+
+未声明证据类型的验证视为未完成（见 SKILL.md Step 4）。
+
 ### 第九步：记录到项目记忆
 
 开发完成后，将关键决策记录到项目记忆（参见 `project-memory-management.md`）：
@@ -400,7 +411,7 @@ CMS 官方规范 > `.editorconfig`/`phpcs.xml` > **风格基线（项目现有�
 | 第八步：交付检查清单 | Lint 检查未通过 | 修复语法错误后重新检查 | 3 | 输出未通过文件清单，建议人工修复 |
 | 第九步：记录到项目记忆 | 项目记忆系统不可用 | 输出 CMS 开发配置到本地文件 | 1 | 标注"开发配置未沉淀"，提示用户手动保存 |
 
-## 关联Skill
+## 关联 reference
 
 - **frontend-design**（前端设计）— CMS 模板页面、后台管理页面、H5 页面需参考 `frontend-design.md` 的视觉、交互、响应式和浏览器验证规范
 - **code-generation**（代码生成）— CMS 代码生成时参考本 Skill 的数据访问层和安全规范

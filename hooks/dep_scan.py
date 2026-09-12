@@ -10,7 +10,8 @@
   - requirements.txt / Pipfile / pyproject.toml → pip-audit
   - composer.json / composer.lock → composer audit
   - go.mod / go.sum → govulncheck
-  - pom.xml → mvn dependency-check
+  - pom.xml → mvn org.owasp:dependency-check-maven:check
+  - build.gradle / build.gradle.kts / gradle.lockfile → ./gradlew dependencyCheckAnalyze
   - Gemfile / Gemfile.lock → bundle audit
 
 输出为提示信息（exit 0），不阻断执行；AI 应根据提示决定是否运行扫描。
@@ -34,7 +35,10 @@ DEP_FILES = {
     "composer.lock": "composer audit",
     "go.mod": "govulncheck ./...",
     "go.sum": "govulncheck ./...",
-    "pom.xml": "mvn dependency-check:check",
+    "pom.xml": "mvn org.owasp:dependency-check-maven:check",
+    "build.gradle": "./gradlew dependencyCheckAnalyze",
+    "build.gradle.kts": "./gradlew dependencyCheckAnalyze",
+    "gradle.lockfile": "./gradlew dependencyCheckAnalyze",
     "gemfile": "bundle audit check",
     "gemfile.lock": "bundle audit check",
 }

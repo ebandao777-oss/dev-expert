@@ -1,18 +1,36 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""PostToolUse hook (GLOBAL): 写源码后扫描调试残留。
+"""PostToolUse hook (GLOBAL): 写源码后扫描调试残留（多语言）。
 
-对齐 Rules §10（错误闭环/勿留调试）：捕获 var_dump/print_r/var_export/die()/exit()/console.log。
-仅对文本源文件生效，跳过 tests 目录（测试辅助允许）。非阻断 exit 1 回显 AI。
+对齐 Rules §10（错误闭环/勿留调试）。覆盖模式：
+- PHP：var_dump / print_r / var_export / die() / exit()
+- JS/TS：console.log / console.debug
+- Java/Kotlin：System.out|err.print[ln|f]() / printStackTrace()
+- Laravel/Symfony：dd() / dump()
+仅对文本源文件生效（含 .java/.kt/.gradle/.xml/.sql 等），跳过 tests 目录（测试辅助允许）。
+非阻断 exit 1 回显 AI；提示语为「请确认是否应保留」——CLI 工具的正常 stdout 输出可能命中。
 """
 import sys
 import os
 import json
 import re
 
-TEXT_EXT = {".php", ".html", ".htm", ".js", ".css", ".py", ".json", ".md", ".txt"}
+TEXT_EXT = {
+    ".php", ".html", ".htm", ".js", ".css", ".py", ".json", ".md", ".txt",
+    # Java 生态 / 其他通用源码
+    ".java", ".kt", ".gradle", ".jsp", ".xml", ".sql", ".vue", ".ts", ".tsx",
+}
 DEBUG = re.compile(
-    r"(?:var_dump|print_r|var_export|\bdie\b|\bexit\b|console\s*\.\s*log)\s*\("
+    # PHP
+    r"(?:var_dump|print_r|var_export|\bdie\b|(?<!\.)\bexit\b)\s*\("
+    # JS / TS
+    r"|console\s*\.\s*(?:log|debug)\s*\("
+    # Java / Kotlin
+    r"|System\s*\.\s*(?:out|err)\s*\.\s*print(?:ln|f)?\s*\("
+    r"|printStackTrace\s*\(\s*\)"
+    # Laravel / Symfony
+    r"|\bdd\s*\("
+    r"|\bdump\s*\("
 )
 
 
@@ -38,7 +56,7 @@ def main():
     if os.path.splitext(path)[1].lower() not in TEXT_EXT:
         return 0
     # 跳过测试目录，避免误报测试辅助代码
-    if "tests" in [s.lower() for s in path.split(os.sep)]:
+    if any(s.lower() in ("tests", "test") for s in path.split(os.sep)):
         return 0
     if not os.path.isfile(path):
         return 0

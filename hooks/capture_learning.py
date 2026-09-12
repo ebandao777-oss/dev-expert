@@ -6,7 +6,7 @@
 改写为 Python 以兼容 Windows 与所有 Agent 工具（CodeBuddy / Trae / Cursor /
 Claude Code / Codex / OpenClaw），不依赖单一平台的 bash 运行时。
 
-设计原则（与 dev-expert 现有 16 个防护 hook 一致）：
+设计原则（与 dev-expert 现有 22 个防护 hook 一致）：
 - 跨工具兼容：stdin 事件字段名多源容错（tool_input/filePath/file_path/path、
   tool_response/tool_output/output/result、prompt/query/user_input）。
 - 非阻塞：默认 exit 0（仅回显提醒文本，交 Agent 判断）；--strict 时命中 exit 1（强提醒）。

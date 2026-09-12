@@ -1,4 +1,4 @@
-﻿# Laravel 专项开发
+# Laravel 专项开发
 
 > 本文件是 `dev-expert` 的 Laravel/PHP 框架专项补充参考，不作为独立子技能计数，也不提供 `@` 显式调用入口。命中 Laravel、Eloquent、Blade、artisan、Migration、Form Request、Queue、PHPUnit、PHPStan 等信号时，按需与 `code-generation`、`cms-development`、`mysql-database`、`api-design`、`software-project` 协同加载。
 
@@ -61,7 +61,7 @@
 - 顺序依赖用 `Bus::chain()`，批处理用 `Bus::batch()`。
 - 对外部 API 调用加限流和超时；重复请求用唯一键或 `ShouldBeUnique`。
 - 状态变更 + 外部副作用优先使用事务后派发 job，并补偿失败状态。
-- **与 Init-Step-Poll 桥接**：需向前端暴露进度 / 允许取消的长任务（批量导入导出 / 生成静态页 / 采集同步），用 `Init → Step → Poll` 包装 Queue Job——Init 派发 Job 并建任务记录、Step（或 Job 内部批处理）更新进度、Poll 查任务状态；纯后端异步（如发通知 / 清缓存）可直接用裸 Queue，无需 Init-Step-Poll 包装。
+- **与 Init-Step-Poll 桥接**：需向前端暴露进度 / 允许取消的长任务（批量导入导出 / 生成静态页 / 采集同步），用 `Init → Step → Poll` 包装 Queue Job——Init 派发 Job 并建任务记录、Step（或 Job 内部批处理）更新进度、Poll 查任务状态；纯后端异步可直接用裸 Queue，无需 Init-Step-Poll 包装。
 
 ## 生产就绪
 
