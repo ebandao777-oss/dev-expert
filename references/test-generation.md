@@ -215,3 +215,7 @@
 - **bug-diagnosis**（Bug诊断）— 修复Bug后可用 `test-generation` 生成回归测试
 - **code-generation**（代码生成）— 生成代码后可用 `test-generation` 生成配套测试
 - **project-memory-management**（项目记忆管理）— 记录测试策略、Mock/Stub 约定和测试覆盖率基线
+
+## 测试资产防作弊
+
+生成或修改测试后，不得为"通过"而放宽既有断言、注释用例、改评分器或跳过 CI —— 测试资产属环境修改权，改动前须停下说明风险并等用户闸门。红线与 Task Contract 四项（`intent / acceptance / forbidden / verify_commands`）见 `ai-coding-governance.md` 第十步。
