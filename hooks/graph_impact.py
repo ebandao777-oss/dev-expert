@@ -37,6 +37,17 @@ ROOT_MARKERS = (".ai-memory", ".codebuddy", ".git")
 SKIP_PREFIXES = (".ai-memory/", ".codebuddy/")
 
 
+def _fix_stdout_encoding():
+    """Windows 控制台默认 GBK，直接 print 非 ASCII（如 ⚠）会抛 UnicodeEncodeError。"""
+    try:
+        import io
+        enc = (sys.stdout.encoding or "").lower().replace("-", "")
+        if enc != "utf8":
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
 def emit(lines, event="PostToolUse"):
     """JSON 契约输出：`hookSpecificOutput.additionalContext` 在 PostToolUse 可达 Agent
     （平台以 <system-reminder> 注入）。`systemMessage` 供 IDE UI。
@@ -118,6 +129,7 @@ def find_graph_script(root):
 
 
 def main():
+    _fix_stdout_encoding()
     data = read_event()
     tool_input = data.get("tool_input") or {}
     path = (tool_input.get("filePath") or tool_input.get("file_path")

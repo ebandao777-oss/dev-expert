@@ -64,21 +64,34 @@ def _looks_like_keyword(s):
     return bool(SEP_RE.search(s)) or len(s) > 16
 
 
+def _split_cells(line):
+    """去掉首尾管线后按 `|` 全拆分并 strip（保留列序，供右侧定列取值）。"""
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|"):
+        s = s[:-1]
+    return [c.strip() for c in s.split("|")]
+
+
 def parse_row(line):
     """解析一行索引 → (err_id, keyword, desc)；非数据行返回 None。
 
     兼容两种列序：
-    - 本技能模板（≥4 段）：`ERR-ID | 一句话描述 | 根因分类 | 触发关键词 | …`
-      → keyword 取第 4 段，desc 取第 2 段。
+    - 本技能模板（≥6 列）：`ERR-ID | 一句话描述 | 根因分类 | 触发关键词 | 日期 | Recurrence-Count`
+      → 触发词按**右侧定列**取（keyword=cells[-3]），描述用 `|` 回拼 cells[1:-4]；
+        故描述内含 `|` 时列序不会左移、触发词不会被顶掉。
     - 精简 3 段：`ERR-ID | 触发关键词 | 描述` → keyword 取第 2 段。
     """
-    parts = [p.strip() for p in line.split("|", 2)]
-    if len(parts) < 2 or not parts[0]:
+    cells = _split_cells(line)
+    if len(cells) < 2 or not cells[0]:
         return None
-    err_id, second = parts[0], parts[1]
-    third = parts[2] if len(parts) > 2 else ""
+    if len(cells) >= 6:
+        return cells[0], cells[-3], "|".join(cells[1:-4]).strip()
+    err_id, second = cells[0], cells[1]
+    third = "|".join(cells[2:]) if len(cells) > 2 else ""
     if third and "|" in third:
-        rest = [p.strip() for p in third.split("|")]
+        rest = cells[2:]
         keyword = rest[1] if len(rest) > 1 else ""
         if keyword:
             return err_id, keyword, second

@@ -116,10 +116,22 @@ def main():
             status = ""
             try:
                 with open(p, encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        if line.strip().startswith("## 状态"):
-                            status = line.strip()
+                    plines = f.read().splitlines()
+                # 状态值可能同行（`## 状态: 进行中`）或下一行（独立 `## 状态`）；两者都取，
+                # 口径与 plan_guard.has_active_plan 的向后 4 行扫描一致。
+                for i, ln in enumerate(plines):
+                    if not ln.strip().startswith("## 状态"):
+                        continue
+                    parts = [ln.strip()]
+                    for j in range(i + 1, min(i + 4, len(plines))):
+                        nxt = plines[j].strip()
+                        if nxt.startswith("## "):
                             break
+                        if nxt:
+                            parts.append(nxt)
+                            break
+                    status = " ".join(parts)
+                    break
             except OSError:
                 pass
             lines.append("- %s  %s" % (fn, status))

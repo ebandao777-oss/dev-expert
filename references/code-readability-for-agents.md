@@ -1,6 +1,6 @@
 # 面向 Agent 的代码可读性（code-readability-for-agents）
 
-> 工程纪律层专项（v1.17.0 起）：以"AI Agent 能否一次定位"为标准的仓库可读性审查。仓库的读者现在至少一半是 Agent——Agent 找不到规范实现，是结构问题，不是 Agent 的问题。
+> 工程纪律层专项：以"AI Agent 能否一次定位"为标准的仓库可读性审查。仓库的读者现在至少一半是 Agent——Agent 找不到规范实现，是结构问题，不是 Agent 的问题。
 
 ## 铁律
 

@@ -10,8 +10,9 @@ import os
 import json
 import re
 
-# <? 后非 php/=/xml 视为短标签（<?php / <?= / <?xml 合法）
-SHORT_TAG = re.compile(r'<\?(?!(php|=|xml)\b)')
+# <? 后非 php/=/xml 视为短标签（<?php / <?= / <?xml 合法；大小写不敏感，<?PHP 非短标签）
+# `=` 后不加 \b：`<?= $x ?>` 的 `=` 后是空格或 `$`，无词边界，加 \b 会把短回显标签误判为短标签
+SHORT_TAG = re.compile(r'<\?(?!php\b|xml\b|=)', re.IGNORECASE)
 # $arr[key] 裸键（key 为字母开头、非 $ 变量、非引号、非纯数字）
 BARE_KEY = re.compile(r'\$\w+\[([A-Za-z_][A-Za-z0-9_]*)\]')
 BAD_FUNCS = [

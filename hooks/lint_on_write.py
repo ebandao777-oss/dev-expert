@@ -35,7 +35,7 @@ _LIN_CANDIDATES = [
     "/usr/local/bin/php{ver}",
     "/opt/php/{ver}/bin/php",
 ]
-# 版本号高到低探测（含本机 F:\BtSoft\php\85 等）
+# 版本号高到低探测（宝塔面板默认路径形如 F:\BtSoft\php\{ver}）
 _VERSIONS = ["85", "84", "83", "82", "81", "80", "74"]
 
 

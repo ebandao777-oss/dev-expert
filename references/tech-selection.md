@@ -179,6 +179,29 @@
 
 **选型原则**：CMS 要求优先 → 用户指定 → 默认 8.2。详见 `cms-development.md`。
 
+## 运行时基线与版本策略
+
+选型定"用哪个技术"，本节定"至少用哪个版本"——避免上线后才发现目标环境低于最低要求。
+
+### 基线表（选型产出必填项）
+
+| 运行时 | 最低支持 | 推荐 | EOL 跟踪 | 校验手段 |
+| --- | --- | --- | --- | --- |
+| PHP | 官方仍在安全支持期的版本 | 次新稳定版 | 官方 Supported Versions 页 | `php -v` + `php8_compat` 扫描 |
+| Node.js | 当前 LTS 或维护期版本 | 最新 LTS | Node 官方 Release 表 | `node -v` |
+| JDK | 仍在维护的 LTS | 最新 LTS | 厂商支持路线图 | `java -version` + `java_compat` |
+| Python | 官方仍在安全支持期的版本 | 次新稳定版 | Python 官方版本状态页 | `python -V` |
+| MySQL / MariaDB | 官方支持期内 | 最新 GA | 官方生命周期页 | `SELECT VERSION()` + `mysql-database.md` |
+| 浏览器（前端项目） | 覆盖目标用户 ≥95% 的最低版本 | 主流基线 | caniuse 使用率 | `browserslist` 配置 |
+
+### 三条策略
+
+1. **禁用 EOL 版本**——选到已停止安全维护的版本（如 PHP 7.4、Node 16）时，须列为风险项并给出迁移窗口；不得以"现网在跑"为由静默接受。
+2. **基线须落声明**——写入项目记忆 Conventions 或项目 README 的运行时章节；口头约定不构成基线（无声明即无校验依据）。
+3. **探测 ≠ 基线符合性**——`lint_on_write.py` / `java_compat.py` 的多版本探测只回答"机器上有什么"，不回答"是否满足基线"；发布前须拿基线与实测版本逐项比对核验。
+
+> CMS 场景的 PHP 版本从「CMS PHP 版本推荐矩阵」取值；矩阵给下限，本节给策略，二者在 CMS 项目内并用。
+
 ## 关联 reference
 
 - **software-project**（软件项目总控）— 技术选型结果应回连 `software-project.md` 总控流程，作为架构决策记录和交付物的一部分

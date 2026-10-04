@@ -173,7 +173,8 @@ def php_syntax_error(content):
 
 
 # --- C2. PHP8 兼容（规则取自 php8_compat.py，对齐 Rules §6） ---
-PHP8_SHORT_TAG = re.compile(r'<\?(?!(php|=|xml)\b)', re.IGNORECASE)
+# `=` 后不加 \b：`<?= $x ?>` 的 `=` 后是空格或 `$`，无词边界，加 \b 会把短回显标签误判为短标签
+PHP8_SHORT_TAG = re.compile(r'<\?(?!php\b|xml\b|=)', re.IGNORECASE)
 PHP8_BARE_KEY = re.compile(r'\$\w+\[([A-Za-z_][A-Za-z0-9_]*)\]')
 PHP8_BAD_FUNCS = [
     (re.compile(r'\beach\s*\('), "each()"),

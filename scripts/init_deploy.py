@@ -10,6 +10,10 @@
 - 本脚本：**编排**——探测使用者机器上装了/在用哪些工具 → 决定各工具 hooks 配置落点
   → 幂等部署 → 校验回读。
 
+数据源：平台定义（探测路径 / 配置落点 / skill 加载形态）**全部**来自 `scripts/platforms.json`
+——单一事实源，本脚本不内联任何平台数据；新增或修正平台只改该 JSON，不改本脚本。
+文件缺失或内容非法时**拒绝启动**（退出码 2），不静默降级为空表。
+
 探测维度（**工具级**，五路证据任一命中即视为"在用"）：
 1. `exe`：常见安装位置的可执行文件（%VAR%/~/绝对路径候选，跨平台）
 2. `cmd`：PATH 中的 CLI 命令（`shutil.which`）
@@ -51,108 +55,17 @@ SKILL_ROOT = (os.path.dirname(SCRIPT_DIR)
 DEFAULT_HOOKS_DIR = os.path.join(SKILL_ROOT, "hooks")
 # 配置源与消费者同目录：模板与脚本同放 scripts/
 DEFAULT_TEMPLATE = os.path.join(SCRIPT_DIR, "hooks.json")
+# 平台声明（单一事实源）：探测路径 / 配置落点 / skill 加载形态
+DEFAULT_PLATFORMS = os.path.join(SCRIPT_DIR, "platforms.json")
 
-# ---------------------------------------------------------------- 工具探测表
-# 说明：路径一律用 %VAR%（Windows）/ ~（跨平台）书写，运行时展开；探测不到即跳过，不猜、不写。
-#   exe      = 可执行文件候选（安装证据）
-#   cmd      = PATH 中的命令名（CLI 证据）
-#   data     = 应用数据目录（"在用"证据）
-#   user_cfg = 用户级配置落点（⚠️ 影响该用户所有项目）
-#   proj_cfg = 项目级配置落点（相对项目根）
-# 标注「未验证」的落点为常见约定，探测到工具但文件不存在时 `--apply` 会新建并在报告中标注。
-TOOL_PROFILES = [
-    {
-        "id": "codebuddy",
-        "name": "CodeBuddy CN",
-        "exe": [
-            "%LOCALAPPDATA%/Programs/CodeBuddy/CodeBuddy.exe",
-            "%LOCALAPPDATA%/Programs/CodeBuddy CN/CodeBuddy CN.exe",
-            "%PROGRAMFILES%/CodeBuddy/CodeBuddy.exe",
-            "/Applications/CodeBuddy.app",
-            "~/Applications/CodeBuddy.app",
-        ],
-        "cmd": ["codebuddy"],
-        "data": [
-            "%APPDATA%/CodeBuddy CN",
-            "%APPDATA%/CodeBuddy",
-            "~/Library/Application Support/CodeBuddy CN",
-            "~/.config/CodeBuddy",
-        ],
-        "user_cfg": ["~/.codebuddy/settings.json"],
-        "proj_cfg": [".codebuddy/settings.json"],
-    },
-    {
-        "id": "trae",
-        "name": "Trae / Trae CN",
-        "exe": [
-            "%LOCALAPPDATA%/Programs/Trae/Trae.exe",
-            "%LOCALAPPDATA%/Programs/Trae CN/Trae CN.exe",
-            "%PROGRAMFILES%/Trae/Trae.exe",
-            "/Applications/Trae.app",
-        ],
-        "cmd": ["trae"],
-        "data": [
-            "%APPDATA%/Trae",
-            "%APPDATA%/Trae CN",
-            "%APPDATA%/TRAE SOLO CN",
-            "~/Library/Application Support/Trae",
-            "~/.config/Trae",
-        ],
-        # 未验证：Trae 用户级 hooks 落点
-        "user_cfg": ["~/.trae/hooks.json"],
-        "proj_cfg": [".trae/hooks.json"],
-    },
-    {
-        "id": "cursor",
-        "name": "Cursor",
-        "exe": [
-            "%LOCALAPPDATA%/Programs/cursor/Cursor.exe",
-            "%LOCALAPPDATA%/Programs/Cursor/Cursor.exe",
-            "/Applications/Cursor.app",
-        ],
-        "cmd": ["cursor"],
-        "data": [
-            "%APPDATA%/Cursor",
-            "~/Library/Application Support/Cursor",
-            "~/.config/Cursor",
-        ],
-        # 未验证：Cursor 用户级 hooks 落点
-        "user_cfg": ["~/.cursor/hooks.json"],
-        "proj_cfg": [".cursor/hooks.json"],
-    },
-    {
-        "id": "claude",
-        "name": "Claude Code",
-        "exe": [
-            "%APPDATA%/npm/claude.cmd",
-            "%LOCALAPPDATA%/Programs/claude/claude.exe",
-            "/usr/local/bin/claude",
-            "/opt/homebrew/bin/claude",
-        ],
-        "cmd": ["claude"],
-        "data": ["~/.claude", "~/Library/Application Support/claude"],
-        # 未验证：Claude Code 用户级配置落点
-        "user_cfg": ["~/.claude/settings.json"],
-        "proj_cfg": [".claude/settings.json"],
-    },
-    {
-        "id": "windsurf",
-        "name": "Windsurf",
-        "exe": [
-            "%LOCALAPPDATA%/Programs/Windsurf/Windsurf.exe",
-            "/Applications/Windsurf.app",
-        ],
-        "cmd": ["windsurf"],
-        "data": [
-            "%APPDATA%/Windsurf",
-            "~/Library/Application Support/Windsurf",
-            "~/.config/Windsurf",
-        ],
-        # 未验证：Windsurf 落点（其工具名与主流不同，需在 matcher 追加 write_file|edit_file）
-        "user_cfg": ["~/.windsurf/hooks.json"],
-        "proj_cfg": [".windsurf/hooks.json"],
-    },
-]
+# 生成 hooks.installed.json 时追加到 _comment 末尾：保留模板原文（含各平台适配说明），
+# 仅补一句自动生成提示，避免注释与"占位符已替换为真实路径"的事实冲突
+GENERATED_COMMENT_SUFFIX = (" ｜ 【自动生成】占位符已替换为真实机器路径，勿手改；"
+                            "换机 / 换项目 / 技能升级后重跑部署器覆盖本文件即可。")
+
+# ---------------------------------------------------------------- 平台声明（外部数据源）
+# 定义见 scripts/platforms.json 的 _comment；该文件缺失或非法即 fail-closed 终止，不降级为空表
+TOOL_PROFILES = []
 
 PLACEHOLDER_PY = "{{PYTHON_BIN}}"
 PLACEHOLDER_DIR = "{{HOOKS_DIR}}"
@@ -163,12 +76,16 @@ MAX_DETAIL = 20
 
 
 def _fix_stdout_encoding():
-    """Windows 控制台默认 GBK，输出中文/符号会抛 UnicodeEncodeError。"""
+    """Windows 控制台默认 GBK，输出中文/符号会抛 UnicodeEncodeError（stdout 与 stderr 同理）。"""
     try:
-        enc = (sys.stdout.encoding or "").lower().replace("-", "")
-        if enc != "utf8":
-            import io
-            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        import io
+        for name in ("stdout", "stderr"):
+            stream = getattr(sys, name, None)
+            if stream is None or not hasattr(stream, "buffer"):
+                continue
+            enc = (stream.encoding or "").lower().replace("-", "")
+            if enc != "utf8":
+                setattr(sys, name, io.TextIOWrapper(stream.buffer, encoding="utf-8", errors="replace"))
     except Exception:
         pass
 
@@ -227,6 +144,43 @@ def detect_hooks_dir(cli_dir):
     if os.path.isdir(DEFAULT_HOOKS_DIR):
         return DEFAULT_HOOKS_DIR
     return SCRIPT_DIR
+
+
+def _fail(msg):
+    """前置检查失败：写 stderr 并以退出码 2 终止（2 = 前置检查失败，见模块 docstring）。"""
+    print("[FAIL] " + msg, file=sys.stderr)
+    raise SystemExit(2)
+
+
+def load_platforms(path=""):
+    """加载平台声明文件（单一事实源 `scripts/platforms.json`）。
+
+    失败即终止（fail-closed）——**不**静默回退空表：空表会被下游读成"本机没装任何工具"，
+    把配置错误伪装成环境缺失。返回平台条目列表，字段语义见该文件 `_comment`。
+    """
+    p = os.path.abspath(path) if path else DEFAULT_PLATFORMS
+    if not os.path.isfile(p):
+        _fail("平台声明文件缺失: %s\n"
+              "       该文件是平台落点的单一事实源，随技能包分发（scripts/platforms.json）。\n"
+              "       请确认技能包完整；或用 --platforms <路径> 显式指定。" % p)
+    try:
+        # utf-8-sig：Windows 记事本 / PowerShell 存盘常带 BOM，兼容有无 BOM 两种写法
+        with open(p, encoding="utf-8-sig") as f:
+            data = json.load(f)
+    except (ValueError, OSError) as e:
+        _fail("平台声明文件无法解析: %s\n       %s" % (p, e))
+    profs = data.get("platforms") if isinstance(data, dict) else None
+    if not isinstance(profs, list) or not profs:
+        _fail("平台声明文件缺少非空的 platforms 数组: %s" % p)
+    ids = []
+    for i, prof in enumerate(profs):
+        if not isinstance(prof, dict) or not prof.get("id") or not prof.get("name"):
+            _fail("platforms[%d] 缺少 id 或 name: %s" % (i, p))
+        ids.append(prof["id"])
+    dup = sorted({x for x in ids if ids.count(x) > 1})
+    if dup:
+        _fail("platforms 中 id 重复: %s (%s)" % (", ".join(dup), p))
+    return profs
 
 
 def detect_tools(root):
@@ -303,9 +257,23 @@ def check_scripts(hooks_dir, names):
 
 
 def render_command(template_cmd, python_bin, hooks_dir):
-    py = python_bin.replace("\\", "\\\\")
-    hd = hooks_dir.replace("\\", "\\\\")
-    return template_cmd.replace(PLACEHOLDER_PY, py).replace(PLACEHOLDER_DIR, hd)
+    """把模板 command 的占位符换成真实路径（**原始**路径，不在此转义）。
+
+    本函数产物会经 json.dump 落盘，json.dump 自身会转义反斜杠；若在此预转义会被二次
+    转义成 `\\\\`。转义只保留在「对模板文本做字符串级替换」的通道（写 hooks.installed.json）。
+    """
+    return template_cmd.replace(PLACEHOLDER_PY, python_bin).replace(PLACEHOLDER_DIR, hooks_dir)
+
+
+def _norm_cmd(cmd):
+    """归一化 command 供幂等比较：连续反斜杠折叠为单个。
+
+    历史版本把路径写成双反斜杠；折叠后与本次生成串判等，旧部署重跑 --apply 时
+    不会被当成「不同路径」而重复注册同名脚本。
+    """
+    while "\\\\" in cmd:
+        cmd = cmd.replace("\\\\", "\\")
+    return cmd
 
 
 def count_entries(template):
@@ -335,7 +303,7 @@ def _existing_keys(cfg, event):
     for it in ((cfg.get("hooks") or {}).get(event) or []):
         matcher = (it or {}).get("matcher", "")
         for h in (it or {}).get("hooks", []) or []:
-            keys.add((matcher, h.get("command", "")))
+            keys.add((matcher, _norm_cmd(h.get("command", ""))))
     return keys
 
 
@@ -351,7 +319,8 @@ def merge_config(cfg, template, python_bin, hooks_dir, allow_overwrite):
             matcher = (it or {}).get("matcher", "")
             for h in (it or {}).get("hooks", []) or []:
                 cmd = render_command(h.get("command", ""), python_bin, hooks_dir)
-                if (matcher, cmd) in have:
+                cmd_key = _norm_cmd(cmd)
+                if (matcher, cmd_key) in have:
                     skipped.append((event, matcher, "已存在"))
                     continue
                 m = PY_NAME_RE.search(cmd)
@@ -382,7 +351,7 @@ def merge_config(cfg, template, python_bin, hooks_dir, allow_overwrite):
                 entry = dict(h)
                 entry["command"] = cmd
                 bucket.append({"matcher": matcher, "hooks": [entry]})
-                have.add((matcher, cmd))
+                have.add((matcher, cmd_key))
                 added.append((event, matcher, base))
     return new_cfg, added, skipped
 
@@ -516,6 +485,21 @@ def build_report(args):
         rendered = raw.replace(PLACEHOLDER_PY, python_bin.replace("\\", "\\\\")) \
                       .replace(PLACEHOLDER_DIR, hooks_dir.replace("\\", "\\\\"))
         json.loads(rendered)
+        m = re.search(r'"_comment"\s*:\s*"((?:[^"\\]|\\.)*)"', rendered)
+        if m:
+            tail = json.loads('"%s"' % m.group(1)) + GENERATED_COMMENT_SUFFIX
+            rendered = (rendered[:m.start()] + '"_comment": ' + json.dumps(tail, ensure_ascii=False)
+                        + rendered[m.end():])
+        json.loads(rendered)
+        if args.events:
+            keep = {e.strip() for e in args.events.split(",") if e.strip()}
+            cfg = json.loads(rendered)
+            hk = cfg.get("hooks")
+            if isinstance(hk, dict):
+                cfg["hooks"] = {k: v for k, v in hk.items() if k in keep}
+                rendered = json.dumps(cfg, ensure_ascii=False, indent=2) + "\n"
+                json.loads(rendered)
+                rp["events_kept"] = sorted(cfg["hooks"].keys())
         if os.path.isfile(installed_path):
             shutil.copy2(installed_path, installed_path + ".bak")
         with open(installed_path, "w", encoding="utf-8", newline="\n") as f:
@@ -602,7 +586,10 @@ def print_report(rp):
             L.append("    [%s] %s → %s%s" % (
                 "用户级" if it["kind"] == "user" else "项目级", it["tool_name"], it["cfg"], extra))
     elif rp.get("tools"):
-        L.append("  部署计划  : 无（未探测到在用工具，或作用域下无落点）")
+        if any(t.get("installed") for t in rp["tools"]):
+            L.append("  部署计划  : 无（已探测到在用工具，但当前作用域 / 项目根下无可用落点，见下方提示）")
+        else:
+            L.append("  部署计划  : 无（未探测到在用工具）")
     if rp.get("installed_json_written"):
         L.append("  hooks.installed.json → %s" % rp["installed_json_written"])
     if rp.get("copied") is not None:
@@ -636,6 +623,8 @@ def main():
     parser.add_argument("--hooks-dir", default="", help="hook 脚本目录（默认：<技能根>/hooks）")
     parser.add_argument("--python-bin", default="", help="Python 解释器路径（默认：PYTHON_BIN 或当前解释器）")
     parser.add_argument("--template", default="", help="hooks.json 模板路径（默认：<技能根>/scripts/hooks.json）")
+    parser.add_argument("--platforms", default="",
+                        help="平台声明文件（默认：<技能根>/scripts/platforms.json）")
     parser.add_argument("--scope", choices=["project", "user", "both"], default="project",
                         help="部署作用域：project=仅当前项目（默认）；user=仅用户级（⚠️ 影响所有项目）；both=两处")
     parser.add_argument("--tools", default="", help="限定工具 id（逗号分隔，如 codebuddy,trae；默认全部探测到的）")
@@ -646,7 +635,13 @@ def main():
     parser.add_argument("--allow-overwrite", action="store_true",
                         help="同名脚本已由其他路径注册时替换（默认跳过）")
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    parser.add_argument("--events", default="",
+                        help="顶层事件键白名单（逗号分隔，如 PreToolUse,PostToolUse）；默认全量不裁剪。"
+                             "平台不认某事件键时可裁剪，避免整份配置加载失败")
     args = parser.parse_args()
+
+    global TOOL_PROFILES
+    TOOL_PROFILES = load_platforms(args.platforms)
 
     report, code = build_report(args)
     if args.json:

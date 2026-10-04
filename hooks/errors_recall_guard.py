@@ -60,29 +60,39 @@ def _looks_like_keyword(s):
     return bool(SEP_RE.search(s)) or len(s) > 16
 
 
+def _split_cells(line):
+    """去掉首尾管线后按 `|` 全拆分并 strip（保留列序，供右侧定列取值）。"""
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|"):
+        s = s[:-1]
+    return [c.strip() for c in s.split("|")]
+
+
 def parse_row(line):
     """解析一行索引 → (err_id, keyword, desc)；非数据行返回 None。
 
     兼容两种列序：
-    - 本技能模板（≥4 段）：`ERR-ID | 一句话描述 | 根因分类 | 触发关键词 | 日期 | Recurrence-Count`
-      → keyword 取第 4 段（index 3），desc 取第 2 段（index 1）。
+    - 本技能模板（≥6 列）：`ERR-ID | 一句话描述 | 根因分类 | 触发关键词 | 日期 | Recurrence-Count`
+      → 触发词按**右侧定列**取（keyword=cells[-3]），描述用 `|` 回拼 cells[1:-4]；
+        故描述内含 `|` 时列序不会左移、触发词不会被顶掉。
     - 精简 3 段：`ERR-ID | 触发关键词 | 描述` → keyword 取 index 1，desc 取 index 2。
-    描述内允许含 `|` → 用 split("|", 2) 限三段解析，避免描述里的 `|` 顶掉触发词。
     """
-    parts = [p.strip() for p in line.split("|", 2)]
-    if len(parts) < 2 or not parts[0]:
+    cells = _split_cells(line)
+    if len(cells) < 2 or not cells[0]:
         return None
-    err_id, second = parts[0], parts[1]
-    third = parts[2] if len(parts) > 2 else ""
-    # 4 段及以上（含 6 列模板）：第二段为描述，第三段以「|」续接其余列；
-    # 续接列序为「根因分类 | 触发关键词 | 日期 | Recurrence-Count」→ 触发词取 rest[1]。
+    if len(cells) >= 6:
+        return cells[0], cells[-3], "|".join(cells[1:-4]).strip()
+    err_id, second = cells[0], cells[1]
+    third = "|".join(cells[2:]) if len(cells) > 2 else ""
+    # 4~5 段旧写法：第二段为描述，第三段起续接「根因分类 | 触发关键词 …」→ 触发词取 rest[1]
     if third and "|" in third:
-        rest = [p.strip() for p in third.split("|")]
+        rest = cells[2:]
         keyword = rest[1] if len(rest) > 1 else ""
-        desc = second
         if keyword:
-            return err_id, keyword, desc
-    # 3 段（或第三段不含更多列）：沿用「触发词在第二段」口径
+            return err_id, keyword, second
+    # 3 段（或续接列不含更多列）：沿用「触发词在第二段」口径
     if _looks_like_keyword(second) or not third:
         return err_id, second, third
     return err_id, second, third

@@ -95,6 +95,8 @@
 - 单条 ERR-XXX.md 超过 500 行时触发拆分提醒
 - 合并规则：连续 3 个 ERR-ID 同一根因 → 合并为一条，保留各变体修复方式
 - **可选分层**（条目增多时启用，非强制）：单条可按 `<年>/<月>/ERR-XXX.md` 分层存放；**默认保持扁平 `errors/ERR-XXX.md`**。两种布局均被 `errors_recall_guard` / `errors_dup_guard` 兼容识别（其 err_id 自排除已按 `/` 末段归一）
+- **归档执行判据**（区别于上方"提醒"，此处可直接执行）：单条同时满足「`Last-Seen` 距今 > 12 个月且正确做法仍成立」与「`Recurrence-Count = 1`」→ 迁至 `errors_archive/ERR-XXX.md`，索引行移入「## 归档区」；任一不满足（12 个月内有末核 / 已复现多次）→ **保留在册**，不因条数阈值被迁出
+- 归档位置：`{PROJECT_ROOT}/.ai-memory/errors_archive/`；阈值口径与 `project-memory-management.md`「工作产物生命周期」一致（单源）
 
 ---
 

@@ -41,6 +41,36 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/egress_scan.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/plan_quality_guard.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit|Bash|execute_command|run_command|run_in_terminal|terminal",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/cmd_hygiene_guard.py\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -211,6 +241,16 @@
             "type": "command",
             "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/rule_ref_guard.py\"",
             "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "write_to_file|replace_in_file|Write|Edit|Bash|execute_command|run_command|run_in_terminal|terminal",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"{{PYTHON_BIN}}\" \"{{HOOKS_DIR}}/measure_advisor.py\"",
+            "timeout": 10
           }
         ]
       }

@@ -57,8 +57,11 @@ def parse_recurrence(md_path):
         return None
 
     def field(name):
-        m = re.search(r"\*{0,2}%s\*{0,2}\s*[:：]\s*(\S+)" % re.escape(name), content)
-        return m.group(1).strip() if m else None
+        # 值后常紧跟全角括号说明（模板：`**Recurrence-Count**：3（复现次数…）`），
+        # 取到 `（`/`(`/`【`/`[` 为止并剥尾随标点，避免把说明吞进值里。
+        m = re.search(
+            r"\*{0,2}%s\*{0,2}\s*[:：]\s*([^\s（(【\[]+)" % re.escape(name), content)
+        return m.group(1).strip().rstrip("，,。.；;：:)）】]") if m else None
 
     return {
         "count": field("Recurrence-Count"),

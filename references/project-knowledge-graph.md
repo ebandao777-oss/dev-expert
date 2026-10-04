@@ -85,7 +85,7 @@ python scripts/build_graph.py --root {PROJECT_ROOT} --query <file|symbol> [--dir
 - **G2' 图谱影响面须附 grep 实测证据**：图谱给出的影响面清单，**必须**经独立 grep 复核（对清单内每个文件确认真实依赖）；交付物须**附 grep 原始输出片段**（如 `grep -rn "class X" 命中 N 处 @ file:line`），SELF-AUDIT 核对证据存在且覆盖清单全部文件；**无证据即判不通过，卡在交付前**（与"无验证证据=未完成"红线同源）。agent 不能靠自评绕过谎报。
 - **G3 不可逆操作单独确认**：删 / 重命名 / DDL 等不可逆操作，**不单凭图谱结论**执行；必须独立 grep 复核真实依赖 + 走用户确认闸门（复用既有"破坏性操作默认取消"铁律）。
 
-## 作用点锚定（实施时写入 SKILL.md Step 2 / Step 3，不靠 agent 猜测）
+## 作用点锚定（锚定 SKILL.md Step 2 ④ 依赖分析 / Step 3 影响面 P2）
 
 | 作用点 | 触发条件 | 钉到 Step | 查什么 | 产出落哪 |
 | - | - | - | - | - |
@@ -138,6 +138,13 @@ python scripts/build_graph.py --root {PROJECT_ROOT} --query <file|symbol> [--dir
 4. 增量四类覆盖：删文件后图谱无悬挂边；改文件后查图谱触发过期判定（STALE）。
 5. 降级可用：构建失败不阻断主任务，回退临时 grep + 交付标注"图谱不可用"。
 6. 决策抽取准确：selftest E2E-11（@decision 抽取+决策边+query 合并）与 E2E-12（决策随代码跨会话保留）通过；Decision Record 与 @decision 锚点互引不重叠。
+
+## 关联 reference
+
+- **task-decomposition-and-execution**（任务拆解与执行）— 复杂任务按 Wave 分组执行：图谱 P1 依赖闭包喂入 `_plan.md` 依赖矩阵
+- **code-review**（代码审查）— 跨模块审查时用图谱定位影响面与依赖闭包，结论仍须 grep 复核
+- **execution-safety**（执行安全）— 图谱结论受 G1「grep 冲突以 grep 为准」约束；不可逆操作走 G3 单独确认
+- **project-memory-management**（项目记忆管理）— 图谱产物与决策边随会话沉淀（`.ai-memory/knowledge-graph/`）
 
 ## 失败回退机制
 
